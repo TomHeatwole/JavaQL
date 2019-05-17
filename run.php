@@ -26,12 +26,10 @@ if (!$conn) { // In this case the connection attempt gave a warning
 if ($conn->connect_error) {
     die($PROJECT_NAME . "Error: Connection failed: " . $conn->connect_error . "\n");
 }
-echo "Connected successfully\n\n";
-
-echo is_numeric("1");
+echo "Connected successfully\n";
 
 // Load Classes
-echo "Loading Classes...\n\n";
+echo "Loading classes...\n";
 $class_map = dict[];
 $result = mysqli_query($conn, "show tables");
 while ($row = mysqli_fetch_row($result)) {
@@ -50,7 +48,7 @@ while ($row = mysqli_fetch_row($result)) {
     }
     $class_map[$row[0]] = $vars;
 }
-var_dump($class_map);
+echo "Classes loaded\n\n";
 
 // Load Symbol table???
 
