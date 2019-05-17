@@ -1,2 +1,2 @@
 #!/bin/bash
-hhvm run.php
+hhvm Run.php

@@ -34,7 +34,7 @@ $class_map = dict[];
 $result = mysqli_query($conn, "show tables");
 while ($row = mysqli_fetch_row($result)) {
     $class = mysqli_query($conn, "describe " . $row[0]);
-    $vars = vec[];
+    $vars = dict[];
     while ($var = mysqli_fetch_assoc($class)) {
         $name = $var['Field'];
         if ($name == "_id") continue;
@@ -44,11 +44,12 @@ while ($row = mysqli_fetch_row($result)) {
             $type = substr($name, 1 + strlen($table_name_length), $table_name_length);
             $name = substr($name, 1 + strlen($table_name_length) + $table_name_length);
         } else $type = $FROM_SQL_TYPE_MAP[$var['Type']];
-        $vars[] = shape('name' => $name, 'type' => $type);
+        $vars[$name] = $type;
     }
     $class_map[$row[0]] = $vars;
 }
 echo "Classes loaded\n\n";
+var_dump($class_map);
 
 // Load Symbol table???
 
@@ -57,7 +58,6 @@ echo "Classes loaded\n\n";
 while (true) {
     $input = trim(readline($PROJECT_NAME . "> "));
     if ($input == "q" || $input == "quit") break;
-
 }
 
 // Parse input
