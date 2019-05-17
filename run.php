@@ -28,8 +28,11 @@ if ($conn->connect_error) {
 echo "Connected successfully\n\n\n";
 
 while (true) {
-    $input = readline($PROJECT_NAME . "> ");
-    if ($input == "q" || $line == "quit") break;
+    $input = trim(readline($PROJECT_NAME . "> "));
+    if ($input == "q" || $input == "quit") break;
+    $result = mysqli_query($conn, $input);
+    if (!$result) echo "FAIL\n";
+    else echo $result;
 }
 
 // Parse input
