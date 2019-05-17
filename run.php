@@ -45,15 +45,7 @@ while ($row = mysqli_fetch_row($result)) {
             for ($i = 2; is_numeric($name[$i]); $i++) $table_name_length .= $name[$i];
             $type = substr($name, 1 + strlen($table_name_length), $table_name_length);
             $name = substr($name, 1 + strlen($table_name_length) + $table_name_length);
-        // TODO: Remove all invalid names from database and chang else back to line below
-        //} else $type = $FROM_SQL_TYPE_MAP[$var['Type']];
-        } else {
-            try {
-                $type = $FROM_SQL_TYPE_MAP[$var['Type']];
-            } catch (Exception $e) { 
-                $type = "invalid";
-            }
-        }
+        } else $type = $FROM_SQL_TYPE_MAP[$var['Type']];
         $vars[] = shape('name' => $name, 'type' => $type);
     }
     $class_map[$row[0]] = $vars;
