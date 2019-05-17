@@ -20,10 +20,21 @@ $conn = mysqli_connect(trim($host), trim($username), trim($password), trim($data
 
 // Check connection
 if (!$conn) { // In this case the connection attempt gave a warning
-    die("Failed to connect due to warning above.\n");
+    die($PROJECT_NAME . "Error: Failed to connect due to warning above.\n");
 }
 if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error . "\n");
+    die($PROJECT_NAME . "Error: Connection failed: " . $conn->connect_error . "\n");
 }
-echo "Connected successfully\n";
+echo "Connected successfully\n\n\n";
+
+while (true) {
+    $input = readline($PROJECT_NAME . "> ");
+    if ($input == "q" || $line == "quit") break;
+}
+
+// Parse input
+//
+// Execute related MySQL
+//
+// Tell user results
 
