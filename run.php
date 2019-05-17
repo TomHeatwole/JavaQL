@@ -28,6 +28,8 @@ if ($conn->connect_error) {
 }
 echo "Connected successfully\n\n";
 
+echo is_numeric("1");
+
 // Load Classes
 echo "Loading Classes...\n\n";
 $class_map = dict[];
@@ -36,11 +38,23 @@ while ($row = mysqli_fetch_row($result)) {
     $class = mysqli_query($conn, "describe " . $row[0]);
     $vars = vec[];
     while ($var = mysqli_fetch_assoc($class)) {
-        if ($var['Field'] == "_id") continue;
-        if ($var['Field'][0] == "_") {
-            // TODO: prase references
+        $name = $var['Field'];
+        if ($name == "_id") continue;
+        if ($name[0] == "_") {
+            $table_name_length = $name[1];
+            for ($i = 2; is_numeric($name[$i]); $i++) $table_name_length .= $name[$i];
+            $type = substr($name, 1 + strlen($table_name_length), $table_name_length);
+            $name = substr($name, 1 + strlen($table_name_length) + $table_name_length);
+        // TODO: Remove all invalid names from database and chang else back to line below
+        //} else $type = $FROM_SQL_TYPE_MAP[$var['Type']];
+        } else {
+            try {
+                $type = $FROM_SQL_TYPE_MAP[$var['Type']];
+            } catch (Exception $e) { 
+                $type = "invalid";
+            }
         }
-        $vars[] = shape('name' => $var['Field'], 'type' => $var['Type']);
+        $vars[] = shape('name' => $name, 'type' => $type);
     }
     $class_map[$row[0]] = $vars;
 }
@@ -53,14 +67,7 @@ var_dump($class_map);
 while (true) {
     $input = trim(readline($PROJECT_NAME . "> "));
     if ($input == "q" || $input == "quit") break;
-    $result = mysqli_query($conn, $input);
-    if (!$result) echo "FAIL\n";
-    /*
-    echo get_class($result);
-    echo get_class($result->fetch_row());
-    echo get_class($result->fetch_assoc());
-     */
-    echo mysqli_fetch_row($result)[0];
+
 }
 
 // Parse input
