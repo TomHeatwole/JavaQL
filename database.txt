@@ -1,4 +1,4 @@
-localhost
-root
-rootpassword
-atabase_name
+<host_name>
+<user_name>
+<password>
+<database_name>
