@@ -82,6 +82,12 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
             $type = ($KEYWORDS->contains($value)) ? TokenType::KEYWORD : TokenType::ID; 
             $ret[] = shape("type" => $type, "value" => $value);
 
+        // int or float literal
+        } else if (is_numeric($line[$i])) {
+            $result = lex_number($line, &$i, false);
+            if ($i == -1) return vec[];
+            $ret[] = $result;
+
         // String literal
         } else if ($line[$i] == "\"") {
             $start = $i;
@@ -117,5 +123,23 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
         } else return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i); 
     }
     return $ret;
+}
+
+function lex_number(string $line, int &$i, bool $decimal): shape("type" => TokenType, "value" => string) {
+    $start = $i;
+    for (; $i < strlen($line) - 1; $i++) {
+        if ($line[$i + 1] == ".") {
+            if ($decimal) {
+                carrot_and_error("invalid decimal", $line, $i + 1);
+                $i = -1;
+                return shape();
+            }
+            $decimal = true;
+        } else if (!is_numeric($line[$i + 1])) break;
+    }
+    return shape(
+        "type" => $decimal ? TokenType::FLOAT_LITERAL : TokenType::INT_LITERAL, 
+        "value" => substr($line, $start, $i - $start + 1)
+    );
 }
 
