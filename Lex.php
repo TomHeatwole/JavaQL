@@ -27,20 +27,6 @@ enum TokenType: int {
     KEYWORD = 22;
 }
 
-/*
-enum CommandName: int {
-    VIEW_CLASSES = 0;
-    VIEW_CLASS = 1;
-    VIEW_SYMBOLS = 2;
-}
-
-$METHOD_NAME_MAP = dict[
-    "viewClasses" => CommandName::VIEW_CLASSES,
-    "viewClass" => CommandName::VIEW_CLASS,
-    "viewSymbols" => CommandName::VIEW_SYMBOLS,
-];
-*/
-
 function carrot_pointer(string $line, int $index) {
     echo $line, "\n", str_repeat(" ", $index), "^\n";
 }
