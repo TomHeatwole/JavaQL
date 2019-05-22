@@ -47,6 +47,11 @@ $KEYWORDS = keyset[
     "new"
 ];
 
+function lex_error(string $message): vec {
+    echo "Error: " . $message . "\n";
+    return vec[];
+}
+
 // For CLI commands
 // No need to worry about comments here
 function lex_command(string $line): vec<shape("type" => TokenType, "value" => string)> {
@@ -58,19 +63,18 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
             // TODO: if start with letter
         } else if ($line[$i] == "\"") {
             $start = $i;
-            for ($i++ ; $i < strlen($line); $i++) {
+            for ($i++; $i < strlen($line); $i++) {
                 if ($line[$i] == "\"" && $line[$i - 1] != "\\") {
                     $ret[] = shape("type" => TokenType::STRING_LITERAL, "value" => substr($line, $start, $i - $start + 1));
                     break;
                 }
-                if ($i == strlen($line)) {
-                    // TODO: Figure out what we're doing on ERRORS
-                    return vec[];
-                }
+            }
+            if ($i == strlen($line)) {
+                return lex_error("unclosed quotation");
+                    //\n " . substr($line, 0, $start + 1) . "\n";
             }
         } else {
-            // TODO: error for unrecognized symbol 
-            return vec[];
+            return lex_error("unrecognized symbol: " . $line[$i]);
         }
     }
     return $ret;
