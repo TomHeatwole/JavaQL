@@ -28,7 +28,7 @@ function carrot_and_error(string $message, string $line, int $index): vec {
 
 // For CLI commands
 // No need to worry about comments here
-function lex_command(string $line): vec<shape("type" => TokenType, "value" => string)> {
+function lex_command(string $line): vec<shape("type" => TokenType, "value" => string, "char_num" => int)> {
     $ESCAPE_CHARS = new Set(vec["b", "t", "0", "n", "r", "\"", "'", "\\"]);
     $KEYWORDS = new Set(vec[
        "viewClasses",
@@ -54,7 +54,7 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
             // TODO: Might need to change to lexing to specific keyword tokentype
             $type = ($KEYWORDS->contains($value)) ? TokenType::KEYWORD : TokenType::ID; 
             if ($value == "true" || $value == "false") $type = TokenType::BOOLEAN_LITERAL;
-            $ret[] = shape("type" => $type, "value" => $value);
+            $ret[] = shape("type" => $type, "value" => $value, "char_num" => $start);
 
         // int or float literal
         } else if (is_numeric($line[$i])) {
@@ -69,7 +69,8 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
                 if ($line[$i] == "\"" && $line[$i - 1] != "\\") {
                     $ret[] = shape(
                         "type" => TokenType::STRING_LITERAL,
-                        "value" => substr($line, $start, $i - $start + 1)
+                        "value" => substr($line, $start, $i - $start + 1),
+                        "char_num" => $start
                     );
                     break;
                 }
@@ -90,12 +91,16 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
                 if ($i + 1 >= strlen($line)) return carrot_and_error("unclosed char literal", $line, $start);
                 if ($line[++$i] != "'") return carrot_and_error("invalid char literal", $line, $start);
             }
-            $ret[] = shape("type" => TokenType::CHAR_LITERAL, "value" => substr($line, $start, $i - $start + 1));
+            $ret[] = shape(
+                "type" => TokenType::CHAR_LITERAL,
+                "value" => substr($line, $start, $i - $start + 1),
+                "char_num" => $start
+            );
 
         // DOT or float
         } else if ($line[$i] == ".") {
             if ($i + 1 == strlen($line) || !(is_numeric($line[$i + 1]))) {
-                $ret[] = shape("type" => TokenType::DOT, "value" => ".");
+                $ret[] = shape("type" => TokenType::DOT, "value" => ".", "char_num" => $i);
             } else {
                 $result = lex_number($line, &$i, true);
                 if ($i == -1) return vec[];
@@ -117,11 +122,11 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
         // Symbols 
         } else {
             if ($i + 1 == strlen($line) || !$SYMBOLS->contains($line[$i] . $line[$i + 1])) {
-                if ($SYMBOLS->contains($line[$i])) $ret[] = shape("type" => TokenType::SYMBOL, "value" => $line[$i]);
+                if ($SYMBOLS->contains($line[$i]))
+                    $ret[] = shape("type" => TokenType::SYMBOL, "value" => $line[$i], "char_num" => $i);
                 else return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i);
-            } else $ret[] = shape("type" => TokenType::SYMBOL, "value" => $line[$i] . $line[++$i]);
+            } else $ret[] = shape("type" => TokenType::SYMBOL, "value" => $line[$i] . $line[++$i], "char_num" => $i - 1);
         } 
-            //return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i); 
     }
     return $ret;
 }
@@ -140,7 +145,8 @@ function lex_number(string $line, int &$i, bool $decimal): shape("type" => Token
     }
     return shape(
         "type" => $decimal ? TokenType::FLOAT_LITERAL : TokenType::INT_LITERAL, 
-        "value" => substr($line, $start, $i - $start + 1)
+        "value" => substr($line, $start, $i - $start + 1),
+        "char_num" => $start
     );
 }
 
