@@ -48,7 +48,7 @@ $KEYWORDS = keyset[
 ];
 
 function lex_error(string $message): vec {
-    echo "Error: " . $message . "\n";
+    echo "Error: ", $message, "\n";
     return vec[];
 }
 

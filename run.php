@@ -60,7 +60,7 @@ while (true) {
     if ($input == "q" || $input == "quit") break;
     $lex = lex_command($input);
     foreach ($lex as $l) {
-        echo $l["value"] . " " . $l["type"] . "\n";
+        echo $l["value"],  " ",  $l["type"],  "\n";
     }
     // TODO: Assume error has been logged and do absolutely nothing on empty vec
 }
