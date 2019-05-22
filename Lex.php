@@ -23,7 +23,8 @@ enum TokenType: int {
     LCURLY = 18;
     RCURLY = 19;
     SEMI = 20;
-    KEYWORD = 21;
+    DOT = 21;
+    KEYWORD = 22;
 }
 
 /*
@@ -93,7 +94,10 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
             $start = $i;
             for ($i++; $i < strlen($line); $i++) {
                 if ($line[$i] == "\"" && $line[$i - 1] != "\\") {
-                    $ret[] = shape("type" => TokenType::STRING_LITERAL, "value" => substr($line, $start, $i - $start + 1));
+                    $ret[] = shape(
+                        "type" => TokenType::STRING_LITERAL,
+                        "value" => substr($line, $start, $i - $start + 1)
+                    );
                     break;
                 }
             }
@@ -114,6 +118,24 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
                 if ($line[++$i] != "'") return carrot_and_error("invalid char literal", $line, $start);
             }
             $ret[] = shape("type" => TokenType::CHAR_LITERAL, "value" => substr($line, $start, $i - $start + 1));
+
+        // DOT or float
+        } else if ($line[$i] == ".") {
+            if ($i + 1 == strlen($line) || !(is_numeric($line[$i + 1]))) {
+                $ret[] = shape("type" => TokenType::DOT, "value" => ".");
+            } else {
+                $result = lex_number($line, &$i, true);
+                if ($i == -1) return vec[];
+                $ret[] = $result;
+            }
+
+        // Negative number; TODO: Figure out if there are other interpretations of '-'
+        } else if ($line[$i] == "-") {
+            if ($i + 1 == strlen($line) || !is_numeric($line[$i + 1]))
+                return carrot_and_error("unrecognized symbol: -", $line, $i);
+            $result = lex_number($line, &$i, false);
+            if ($i == -1) return vec[];
+            $ret[] = $result;
 
         // Underscore error
         } else if ($line[$i] == "_") {
