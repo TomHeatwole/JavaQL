@@ -8,23 +8,8 @@ enum TokenType: int {
     BOOLEAN_LITERAL = 3;
     STRING_LITERAL = 4;
     CHAR_LITERAL = 5;
-    LT = 6;
-    GT = 7;
-    LTE = 8;
-    GTE = 9;
-    ASSIGN = 10;
-    EQUAL = 11;
-    AND = 12;
-    OR = 13;
-    LPAREN = 14;
-    RPAREN = 15;
-    LBRACKET = 16;
-    RBRACKET = 17;
-    LCURLY = 18;
-    RCURLY = 19;
-    SEMI = 20;
-    DOT = 21;
-    KEYWORD = 22;
+    SYMBOL = 6;
+    KEYWORD = 7;
 }
 
 function carrot_pointer(string $line, int $index) {
@@ -52,6 +37,7 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
         "class",
         "new"
     ]);
+    $SYMBOLS = new Set(vec["<", ">", "<=", ">=", "=", "==", "&&", "||", "(", ")", "[", "]", "{", "}", ";", "."]);
 
     $ret = vec[];
     // For loop starts on beginning of new token attempt
@@ -128,8 +114,14 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
         } else if ($line[$i] == "_") {
             return carrot_and_error("JavaQL identifiers may not begin with an unerscore", $line, $i);
 
-        // Unrecognized
-        } else return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i); 
+        // Symbols 
+        } else {
+            if ($i + 1 == strlen($line) || !$SYMBOLS->contains($line[$i] . $line[$i + 1])) {
+                if ($SYMBOLS->contains($line[$i])) $ret[] = shape("type" => TokenType::SYMBOL, "value" => $line[$i]);
+                else return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i);
+            } else $ret[] = shape("type" => TokenType::SYMBOL, "value" => $line[$i] . $line[++$i]);
+        } 
+            //return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i); 
     }
     return $ret;
 }
