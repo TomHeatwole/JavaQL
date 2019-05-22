@@ -1,5 +1,6 @@
 <?hh
 
+// TODO: Decide whether to break up KEYWORD into separate tokens or combine SYMBOL into one token
 enum TokenType: int {
     ID = 0;
     INT_LITERAL = 1;
@@ -25,8 +26,6 @@ enum TokenType: int {
     KEYWORD = 21;
 }
 
-
-
 /*
 enum CommandName: int {
     VIEW_CLASSES = 0;
@@ -41,17 +40,7 @@ $METHOD_NAME_MAP = dict[
 ];
 */
 
-/*
-$KEYWORDS = keyset[
-   "viewClasses",
-    "viewClass",
-    "viewSymbol",
-    "class",
-    "new"
-];
- */
-
-function carrot_pointer(string $line, int $index) { // TODO: figure out if this is the most efficient way
+function carrot_pointer(string $line, int $index) {
     echo $line, "\n", str_repeat(" ", $index), "^\n";
 }
 
@@ -69,13 +58,31 @@ function carrot_and_error(string $message, string $line, int $index): vec {
 // No need to worry about comments here
 function lex_command(string $line): vec<shape("type" => TokenType, "value" => string)> {
     $ESCAPE_CHARS = new Set(vec["b", "t", "0", "n", "r", "\"", "'", "\\"]);
+    $KEYWORDS = new Set(vec[
+       "viewClasses",
+        "viewClass",
+        "viewSymbol",
+        "class",
+        "new"
+    ]);
 
     $ret = vec[];
     // For loop starts on beginning of new token attempt
     for ($i = 0; $i < strlen($line); $i++) {
         if ($line[$i] == " ") continue;
+
+        // Begins with letter (keyword or ID)
         if (ctype_alpha($line[$i])) {
-            // TODO: if start with letter
+            $start = $i;
+            for (; $i < strlen($line) - 1; $i++) {
+                if (!ctype_alpha($line[$i + 1]) && !is_numeric($line[$i + 1])) break;
+            }
+            $value = substr($line, $start, $i - $start + 1);
+            // TODO: Might need to change to lexing to specific keyword tokentype
+            $type = ($KEYWORDS->contains($value)) ? TokenType::KEYWORD : TokenType::ID; 
+            $ret[] = shape("type" => $type, "value" => $value);
+
+        // String literal
         } else if ($line[$i] == "\"") {
             $start = $i;
             for ($i++; $i < strlen($line); $i++) {
@@ -85,6 +92,8 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
                 }
             }
             if ($i == strlen($line)) return carrot_and_error("unclosed quotation", $line, $start);
+
+        // Char literal
         } else if ($line[$i] == "'") {
             if ($i + 1 == strlen($line)) return carrot_and_error("unclosed char literal", $line, $start);
             $start = $i;
@@ -99,6 +108,8 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
                 if ($line[++$i] != "'") return carrot_and_error("invalid char literal", $line, $start);
             }
             $ret[] = shape("type" => TokenType::CHAR_LITERAL, "value" => substr($line, $start, $i - $start + 1));
+
+        // Unrecognized
         } else return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i); 
     }
     return $ret;
