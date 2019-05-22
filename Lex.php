@@ -72,7 +72,7 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
     for ($i = 0; $i < strlen($line); $i++) {
         if ($line[$i] == " ") continue;
 
-        // Begins with letter (keyword or ID)
+        // Begins with letter (keyword, boolean literal, ID)
         if (ctype_alpha($line[$i])) {
             $start = $i;
             for (; $i < strlen($line) - 1; $i++) {
@@ -81,6 +81,7 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
             $value = substr($line, $start, $i - $start + 1);
             // TODO: Might need to change to lexing to specific keyword tokentype
             $type = ($KEYWORDS->contains($value)) ? TokenType::KEYWORD : TokenType::ID; 
+            if ($value == "true" || $value == "false") $type = TokenType::BOOLEAN_LITERAL;
             $ret[] = shape("type" => $type, "value" => $value);
 
         // int or float literal
