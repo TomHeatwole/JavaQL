@@ -1,6 +1,7 @@
 <?hh  // strict
 
 include("globals.php");
+include("Lex.php");
 
 
 $config_file = fopen('database.txt', 'r');
@@ -49,7 +50,6 @@ while ($row = mysqli_fetch_row($result)) {
     $class_map[$row[0]] = $vars;
 }
 echo "Classes loaded\n\n";
-var_dump($class_map);
 
 // Load Symbol table???
 
@@ -58,6 +58,11 @@ var_dump($class_map);
 while (true) {
     $input = trim(readline($PROJECT_NAME . "> "));
     if ($input == "q" || $input == "quit") break;
+    $lex = lex_command($input);
+    foreach ($lex as $l) {
+        echo $l["value"] . " " . $l["type"];
+    }
+    // TODO: Assume error has been logged and do absolutely nothing on empty vec
 }
 
 // Parse input
