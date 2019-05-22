@@ -60,7 +60,10 @@ function lex_error(string $message): vec {
     return vec[];
 }
 
-// TODO: carrot_and_error function
+function carrot_and_error(string $message, string $line, int $index): vec {
+    carrot_pointer($line, $index);
+    return lex_error($message);
+}
 
 // For CLI commands
 // No need to worry about comments here
@@ -81,45 +84,22 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
                     break;
                 }
             }
-            if ($i == strlen($line)) {
-                carrot_pointer($line, $start);
-                return lex_error("unclosed quotation");
-            }
+            if ($i == strlen($line)) return carrot_and_error("unclosed quotation", $line, $start);
         } else if ($line[$i] == "'") {
-            if ($i + 1 == strlen($line)) {
-                carrot_pointer($line, $i);
-                return lex_error("unclosed char literal");
-            }
+            if ($i + 1 == strlen($line)) return carrot_and_error("unclosed char literal", $line, $start);
             $start = $i;
             $c = $line[++$i];
-            if ($c == "'") {
-                carrot_pointer($line, $start);
-                return lex_error("empry char literal");
-            }
+            if ($c == "'") return carrot_and_error("empty char literal", $line, $start);
             if ($c == "\\") { // TODO: Add support for unicode escape sequences
-                if ($i + 2 >= strlen($line)) {
-                    carrot_pointer($line, $start);
-                    return lex_error("unclosed char literal");
-                }
-                if ($line[$i += 2] != "'" || !$ESCAPE_CHARS->contains($line[$i - 1])) {
-                    carrot_pointer($line, $start);
-                    return lex_error("invalid char literal");
-                }
+                if ($i + 2 >= strlen($line)) return carrot_and_error("unclosed char literal", $line, $start);
+                if ($line[$i += 2] != "'" || !$ESCAPE_CHARS->contains($line[$i - 1]))
+                    return carrot_and_error("invalid char literal", $line, $start);
             } else {
-                if ($i + 1 >= strlen($line)) {
-                    carrot_pointer($line, $start);
-                    return lex_error("unclosed char literal");
-                }
-                if ($line[++$i] != "'") {
-                    carrot_pointer($line, $start);
-                    return lex_error("invalid char literal");
-                }
+                if ($i + 1 >= strlen($line)) return carrot_and_error("unclosed char literal", $line, $start);
+                if ($line[++$i] != "'") return carrot_and_error("invalid char literal", $line, $start);
             }
             $ret[] = shape("type" => TokenType::CHAR_LITERAL, "value" => substr($line, $start, $i - $start + 1));
-        } else {
-            carrot_pointer($line, $i);
-            return lex_error("unrecognized symbol: " . $line[$i]);
-        }
+        } else return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i); 
     }
     return $ret;
 }
