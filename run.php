@@ -1,6 +1,6 @@
 <?hh  // strict
 
-include("globals.php");
+include("Globals.php");
 include("Lex.php");
 
 

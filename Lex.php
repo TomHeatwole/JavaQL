@@ -47,6 +47,12 @@ $KEYWORDS = keyset[
     "new"
 ];
 
+function carrot_pointer(string $line, int $index) { // TODO: figure out if this is the most efficient way
+    echo $line, "\n";
+    for ($i = 0; $i < $index; $i++) echo " ";
+    echo "^\n";
+}
+
 function lex_error(string $message): vec {
     echo "Error: ", $message, "\n";
     return vec[];
@@ -70,10 +76,11 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
                 }
             }
             if ($i == strlen($line)) {
+                carrot_pointer($line, $start);
                 return lex_error("unclosed quotation");
-                    //\n " . substr($line, 0, $start + 1) . "\n";
             }
         } else {
+            carrot_pointer($line, $i);
             return lex_error("unrecognized symbol: " . $line[$i]);
         }
     }
