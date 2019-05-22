@@ -75,7 +75,7 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
         if (ctype_alpha($line[$i])) {
             $start = $i;
             for (; $i < strlen($line) - 1; $i++) {
-                if (!ctype_alpha($line[$i + 1]) && !is_numeric($line[$i + 1])) break;
+                if (!ctype_alpha($line[$i + 1]) && !is_numeric($line[$i + 1]) && $line[$i + 1] != "_") break;
             }
             $value = substr($line, $start, $i - $start + 1);
             // TODO: Might need to change to lexing to specific keyword tokentype
@@ -108,6 +108,10 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
                 if ($line[++$i] != "'") return carrot_and_error("invalid char literal", $line, $start);
             }
             $ret[] = shape("type" => TokenType::CHAR_LITERAL, "value" => substr($line, $start, $i - $start + 1));
+
+        // Underscore error
+        } else if ($line[$i] == "_") {
+            return carrot_and_error("JavaQL identifiers may not begin with an unerscore", $line, $i);
 
         // Unrecognized
         } else return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i); 
