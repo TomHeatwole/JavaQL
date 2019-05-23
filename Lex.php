@@ -47,8 +47,9 @@ function lex_command(
         "getClasses",
         "getClassNames",
         "getClass",
-        "class",
-        "new"
+        "getAllObjects",
+        "getObjects",
+        "new",
     ]);
     $SYMBOLS = new Set(vec["<", ">", "<=", ">=", "=", "==", "&&", "||", "(", ")", "[", "]", "{", "}", ";", "."]);
 

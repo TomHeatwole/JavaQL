@@ -59,10 +59,10 @@ while (true) {
     $line = trim(readline($PROJECT_NAME . "> "));
     if ($line == "q" || $line == "quit") break;
     $lex = lex_command($line, $class_map, $sym_table);
-    if (count($lex) > 0) parse_and_execute($lex, $line, $class_map);
+    if (count($lex) > 0) parse_and_execute($lex, $line, $class_map, $conn);
 }
 
-function parse_and_execute(vec$lex, string $line, Map $class_map) {
+function parse_and_execute(vec$lex, string $line, Map $class_map, $conn) {
     switch ($lex[0]["type"]) {
         case TokenType::EOF:
             return;
@@ -87,7 +87,23 @@ function parse_and_execute(vec$lex, string $line, Map $class_map) {
                     if (!semi_or_end($lex, 3, $line)) return; 
                     echo json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT), "\n";
                     return;
-                case "new":
+                case "getAllObjects":
+                    if (!match_exact($lex, 1, $line, shape("type" => TokenType::SYMBOL, "value" => "("))) return;
+                    if (!($class_name = match_type($lex, 2, $line, TokenType::CLASS_ID))) return;
+                    if (!match_exact($lex, 3, $line, shape("type" => TokenType::SYMBOL, "value" => ")"))) return;
+                    if (!semi_or_end($lex, 4, $line)) return; 
+                    $print = vec[];
+                    $var_names = $class_map[$class_name]->toKeysArray();
+                    $var_types = $class_map[$class_name]->toValuesArray();
+                    $result = mysqli_query($conn, "SELECT * FROM " . $class_name);
+                    while ($row = mysqli_fetch_row($result)) {
+                        $vars = dict[];
+                        for ($i = 1; $i < count($row); $i++) {
+                            $vars[$var_names[$i - 1]] = $var_types[$i - 1] == "boolean" ? (boolean)$row[$i] : $row[$i];
+                        }
+                        $print[] = $vars;
+                    }
+                    echo json_encode($print, JSON_PRETTY_PRINT), "\n";
             }
     }
 }
@@ -95,12 +111,15 @@ function parse_and_execute(vec$lex, string $line, Map $class_map) {
 // Returns value of matched type on success or false on failure
 function match_type(vec $lex, int $i, string $line, TokenType $e) {
     $TOKEN_NAME_MAP = new Map(dict[
+        /*
         TokenType::INT_LITERAL => "integer",
         TokenType::FLOAT_LITERAL => "float",
         TokenType::BOOLEAN_LITERAL => "boolean",
         TokenType::STRING_LITERAL => "string",
         TokenType::CHAR_LITERAL => "char",
+         */
         TokenType::CLASS_ID => "class name",
+        /*
         TokenType::ID => "identifier",
         TokenType::INT_ID => "integer",
         TokenType::FLOAT_ID => "float",
@@ -110,6 +129,7 @@ function match_type(vec $lex, int $i, string $line, TokenType $e) {
         TokenType::SYMBOL => "symbol",
         TokenType::KEYWORD => "keyword",
         TokenType::EOF => "end of file",
+         */
     ]);
 
     if ($lex[$i]["type"] != $e) {
@@ -133,3 +153,4 @@ function semi_or_end(vec $lex, int $i, string $line): boolean {
     carrot_and_error("unexpected token: " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
     return false;
 }
+
