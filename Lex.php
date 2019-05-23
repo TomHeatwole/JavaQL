@@ -1,16 +1,24 @@
 <?hh
 
+include("Globals.php");
+
 // TODO: Decide whether to break up KEYWORD into separate tokens or combine SYMBOL into one token
 enum TokenType: int {
-    ID = 0;
-    INT_LITERAL = 1;
-    FLOAT_LITERAL = 2;
-    BOOLEAN_LITERAL = 3;
-    STRING_LITERAL = 4;
-    CHAR_LITERAL = 5;
-    SYMBOL = 6;
-    KEYWORD = 7;
-    EOF = 8;
+    INT_LITERAL = 0;
+    FLOAT_LITERAL = 1;
+    BOOLEAN_LITERAL = 2;
+    STRING_LITERAL = 3;
+    CHAR_LITERAL = 4;
+    ID = 5; // new ID and class variables
+    INT_ID = 6;
+    FLOAT_ID = 7;
+    BOOLEAN_ID = 8;
+    STRING_ID = 9;
+    CHAR_ID = 10;
+    CLASS_ID = 11;
+    SYMBOL = 12;
+    KEYWORD = 13;
+    EOF = 14;
 }
 
 function carrot_pointer(string $line, int $index) {
@@ -29,7 +37,10 @@ function carrot_and_error(string $message, string $line, int $index): vec {
 
 // For CLI commands
 // No need to worry about comments here
-function lex_command(string $line): vec<shape("type" => TokenType, "value" => string, "char_num" => int)> {
+function lex_command(
+    string $line,
+    Map $class_map
+): vec<shape("type" => TokenType, "value" => string, "char_num" => int)> {
     $ESCAPE_CHARS = new Set(vec["b", "t", "0", "n", "r", "\"", "'", "\\"]);
     $KEYWORDS = new Set(vec[
        "viewClasses",
@@ -53,8 +64,11 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
             }
             $value = substr($line, $start, $i - $start + 1);
             // TODO: Might need to change to lexing to specific keyword tokentype
-            $type = ($KEYWORDS->contains($value)) ? TokenType::KEYWORD : TokenType::ID; 
-            if ($value == "true" || $value == "false") $type = TokenType::BOOLEAN_LITERAL;
+            $type = TokenType::ID;
+            if ($KEYWORDS->contains($value)) $type = TokenType::KEYWORD;
+            else if ($value == "true" || $value == "false") $type = TokenType::BOOLEAN_LITERAL;
+            else if ($class_map->containsKey($value)) $type = TokenType::CLASS_ID;
+            // else symbol table
             $ret[] = shape("type" => $type, "value" => $value, "char_num" => $start);
 
         // int or float literal

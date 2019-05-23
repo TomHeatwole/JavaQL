@@ -51,6 +51,8 @@ while ($row = mysqli_fetch_row($result)) {
 }
 echo "Classes loaded\n\n";
 
+$class_map = new Map($class_map);
+var_dump($class_map);
 // Load Symbol table???
 
 
@@ -58,7 +60,7 @@ echo "Classes loaded\n\n";
 while (true) {
     $input = trim(readline($PROJECT_NAME . "> "));
     if ($input == "q" || $input == "quit") break;
-    $lex = lex_command($input);
+    $lex = lex_command($input, $class_map);
     foreach ($lex as $l) {
         echo $l["value"],  " ",  $l["type"],  "\n";
     }

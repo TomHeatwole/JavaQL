@@ -14,4 +14,5 @@
         "float" => "float",
         "double" => "double",
     ];
+    $CLASS_MAP = new Map();
 
