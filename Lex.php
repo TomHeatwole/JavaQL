@@ -44,9 +44,9 @@ function lex_command(
 ): vec<shape("type" => TokenType, "value" => string, "char_num" => int)> {
     $ESCAPE_CHARS = new Set(vec["b", "t", "0", "n", "r", "\"", "'", "\\"]);
     $KEYWORDS = new Set(vec[
-       "viewClasses",
-        "viewClass",
-        "viewSymbol",
+        "getClasses",
+        "getClassNames",
+        "getClass",
         "class",
         "new"
     ]);
@@ -116,7 +116,7 @@ function lex_command(
         // DOT or float
         } else if ($line[$i] == ".") {
             if ($i + 1 == strlen($line) || !(is_numeric($line[$i + 1]))) {
-                $ret[] = shape("type" => TokenType::DOT, "value" => ".", "char_num" => $i);
+                $ret[] = shape("type" => TokenType::SYMBOL, "value" => ".", "char_num" => $i);
             } else {
                 $result = lex_number($line, &$i, true);
                 if ($i == -1) return vec[];

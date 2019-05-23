@@ -52,7 +52,6 @@ while ($row = mysqli_fetch_row($result)) {
 echo "Classes loaded\n\n";
 
 $class_map = new Map($class_map);
-var_dump($class_map);
 
 $sym_table = new Map();
 
@@ -61,23 +60,27 @@ while (true) {
     $line = trim(readline($PROJECT_NAME . "> "));
     if ($line == "q" || $line == "quit") break;
     $lex = lex_command($line, $class_map, $sym_table);
-    foreach ($lex as $l) {
-        echo $l["value"],  " ",  $l["type"],  "\n";
-    }
-    if (count($lex) > 0) parse_and_execute($lex, $line);
+    if (count($lex) > 0) parse_and_execute($lex, $line, $class_map);
 }
 
-function parse_and_execute(vec$lex, string $line) {
+function parse_and_execute(vec$lex, string $line, Map $class_map) {
     switch ($lex[0]["type"]) {
         case TokenType::EOF:
             return;
         case TokenType::KEYWORD:
             switch ($lex[0]["value"]) {
-                case "viewClasses":
+                case "getClasses":
                     if (!match($lex, 1, $line, shape("type" => TokenType::SYMBOL, "value" => "("))) return;
                     if (!match($lex, 2, $line, shape("type" => TokenType::SYMBOL, "value" => ")"))) return;
                     if (!semi_or_end($lex, 3, $line)) return; 
-                    // TODO: Success case
+                    echo json_encode($class_map, JSON_PRETTY_PRINT), "\n";
+                    break;
+                case "getClassNames":
+                    if (!match($lex, 1, $line, shape("type" => TokenType::SYMBOL, "value" => "("))) return;
+                    if (!match($lex, 2, $line, shape("type" => TokenType::SYMBOL, "value" => ")"))) return;
+                    if (!semi_or_end($lex, 3, $line)) return; 
+                    echo json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT), "\n";
+                    break;
             }
     }
 }
