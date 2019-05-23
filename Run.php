@@ -81,12 +81,12 @@ function parse_and_execute(vec$lex, string $line, Map $class_map) {
                         case TokenType::CLASS_ID:
                             break;
                         case TokenType::ID:
-                            carrot_and_error("Unrecognized class name: " . $lex[2]["value"], $line, $lex[2]["char_num"]);
+                            carrot_and_error("unrecognized class name: " . $lex[2]["value"], $line, $lex[2]["char_num"]);
                             echo "If a .java file exists for this class try running buildAll() or build("  
                                 . $lex[2]["value"] . ")\n";
                             return;
                         default:
-                            carrot_and_error("Expected class name but found " . $lex[2]["value"], $line, $lex[2]["char_num"]);
+                            carrot_and_error("expected class name but found " . $lex[2]["value"], $line, $lex[2]["char_num"]);
                             return;
                     }
                     if (!match($lex, 3, $line, shape("type" => TokenType::SYMBOL, "value" => ")"))) return;
@@ -99,13 +99,14 @@ function parse_and_execute(vec$lex, string $line, Map $class_map) {
                     if (!semi_or_end($lex, 3, $line)) return; 
                     echo json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT), "\n";
                     return;
+                //case "new":
             }
     }
 }
 
 function match(vec $lex, int $i, string $line, $e): boolean {
     if ($lex[$i]["type"] != $e["type"] || $lex[$i]["value"] != $e["value"]) {
-        carrot_and_error("Expected " . $e["value"] . " but found " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
+        carrot_and_error("expected " . $e["value"] . " but found " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
         return false;
     }
     return true;
@@ -114,6 +115,6 @@ function match(vec $lex, int $i, string $line, $e): boolean {
 function semi_or_end(vec $lex, int $i, string $line): boolean {
     if ($lex[$i]["type"] == TokenType::EOF) return true;
     else if ($lex[$i]["type"] == TokenType::SYMBOL && $lex[$i]["value"] == ";" && $lex[++$i]["type"] == TokenType::EOF) return true;
-    carrot_and_error("Unexpected token: " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
+    carrot_and_error("unexpected token: " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
     return false;
 }
