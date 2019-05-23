@@ -10,6 +10,7 @@ enum TokenType: int {
     CHAR_LITERAL = 5;
     SYMBOL = 6;
     KEYWORD = 7;
+    EOF = 8;
 }
 
 function carrot_pointer(string $line, int $index) {
@@ -128,6 +129,7 @@ function lex_command(string $line): vec<shape("type" => TokenType, "value" => st
             } else $ret[] = shape("type" => TokenType::SYMBOL, "value" => $line[$i] . $line[++$i], "char_num" => $i - 1);
         } 
     }
+    $ret[] = shape("type" => TokenType::EOF, "value" => null);
     return $ret;
 }
 
