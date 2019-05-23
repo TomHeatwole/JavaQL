@@ -63,6 +63,9 @@ while (true) {
 }
 
 function parse_and_execute(vec$lex, string $line, Map $class_map, $conn) {
+    $PRIM = new Set(vec["short", "byte", "int", "long", "float", "double", "char", "doule"]);
+    // JavaQL primitives, not Java
+
     switch ($lex[0]["type"]) {
         case TokenType::EOF:
             return;
@@ -99,7 +102,11 @@ function parse_and_execute(vec$lex, string $line, Map $class_map, $conn) {
                     while ($row = mysqli_fetch_row($result)) {
                         $vars = dict[];
                         for ($i = 1; $i < count($row); $i++) {
-                            $vars[$var_names[$i - 1]] = $var_types[$i - 1] == "boolean" ? (boolean)$row[$i] : $row[$i];
+                            $display_val = $row[$i];
+                            if ($var_types[$i - 1] == "boolean") $display_val = (boolean)$display_val;
+                            else if (!$PRIM->contains($var_types[$i - 1]))
+                                $display_val = $var_types[$i - 1] . "@" . $row[$i];
+                            $vars[$var_names[$i - 1]] = $display_val;
                         }
                         $print[] = $vars;
                     }
