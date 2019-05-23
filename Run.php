@@ -74,13 +74,31 @@ function parse_and_execute(vec$lex, string $line, Map $class_map) {
                     if (!match($lex, 2, $line, shape("type" => TokenType::SYMBOL, "value" => ")"))) return;
                     if (!semi_or_end($lex, 3, $line)) return; 
                     echo json_encode($class_map, JSON_PRETTY_PRINT), "\n";
-                    break;
+                    return;
+                case "getClass":
+                    if (!match($lex, 1, $line, shape("type" => TokenType::SYMBOL, "value" => "("))) return;
+                    switch($lex[2]["type"]) {
+                        case TokenType::CLASS_ID:
+                            break;
+                        case TokenType::ID:
+                            carrot_and_error("Unrecognized class name: " . $lex[2]["value"], $line, $lex[2]["char_num"]);
+                            echo "If a .java file exists for this class try running buildAll() or build("  
+                                . $lex[2]["value"] . ")\n";
+                            return;
+                        default:
+                            carrot_and_error("Expected class name but found " . $lex[2]["value"], $line, $lex[2]["char_num"]);
+                            return;
+                    }
+                    if (!match($lex, 3, $line, shape("type" => TokenType::SYMBOL, "value" => ")"))) return;
+                    if (!semi_or_end($lex, 4, $line)) return; 
+                    echo json_encode($class_map[$lex[2]["value"]], JSON_PRETTY_PRINT), "\n";
+                    return;
                 case "getClassNames":
                     if (!match($lex, 1, $line, shape("type" => TokenType::SYMBOL, "value" => "("))) return;
                     if (!match($lex, 2, $line, shape("type" => TokenType::SYMBOL, "value" => ")"))) return;
                     if (!semi_or_end($lex, 3, $line)) return; 
                     echo json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT), "\n";
-                    break;
+                    return;
             }
     }
 }
