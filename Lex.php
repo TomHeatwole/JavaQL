@@ -39,7 +39,8 @@ function carrot_and_error(string $message, string $line, int $index): vec {
 // No need to worry about comments here
 function lex_command(
     string $line,
-    Map $class_map
+    Map $class_map,
+    Map $sym_table,
 ): vec<shape("type" => TokenType, "value" => string, "char_num" => int)> {
     $ESCAPE_CHARS = new Set(vec["b", "t", "0", "n", "r", "\"", "'", "\\"]);
     $KEYWORDS = new Set(vec[
@@ -143,7 +144,7 @@ function lex_command(
             } else $ret[] = shape("type" => TokenType::SYMBOL, "value" => $line[$i] . $line[++$i], "char_num" => $i - 1);
         } 
     }
-    $ret[] = shape("type" => TokenType::EOF, "value" => null);
+    $ret[] = shape("type" => TokenType::EOF, "value" => "End of line", "char_num" => strlen($line));
     return $ret;
 }
 

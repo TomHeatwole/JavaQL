@@ -47,29 +47,52 @@ while ($row = mysqli_fetch_row($result)) {
         } else $type = $FROM_SQL_TYPE_MAP[$var['Type']];
         $vars[$name] = $type;
     }
-    $class_map[$row[0]] = $vars;
+    $class_map[$row[0]] = new Map($vars);
 }
 echo "Classes loaded\n\n";
 
 $class_map = new Map($class_map);
 var_dump($class_map);
-// Load Symbol table???
 
+$sym_table = new Map();
 
 // Begin CLI 
 while (true) {
-    $input = trim(readline($PROJECT_NAME . "> "));
-    if ($input == "q" || $input == "quit") break;
-    $lex = lex_command($input, $class_map);
+    $line = trim(readline($PROJECT_NAME . "> "));
+    if ($line == "q" || $line == "quit") break;
+    $lex = lex_command($line, $class_map, $sym_table);
     foreach ($lex as $l) {
         echo $l["value"],  " ",  $l["type"],  "\n";
     }
-    // TODO: Assume error has been logged and do absolutely nothing on empty vec
+    if (count($lex) > 0) parse_and_execute($lex, $line);
 }
 
-// Parse input
-//
-// Execute related MySQL
-//
-// Tell user results
+function parse_and_execute(vec$lex, string $line) {
+    switch ($lex[0]["type"]) {
+        case TokenType::EOF:
+            return;
+        case TokenType::KEYWORD:
+            switch ($lex[0]["value"]) {
+                case "viewClasses":
+                    if (!match($lex, 1, $line, shape("type" => TokenType::SYMBOL, "value" => "("))) return;
+                    if (!match($lex, 2, $line, shape("type" => TokenType::SYMBOL, "value" => ")"))) return;
+                    if (!semi_or_end($lex, 3, $line)) return; 
+                    // TODO: Success case
+            }
+    }
+}
 
+function match(vec $lex, int $i, string $line, $e): boolean {
+    if ($lex[$i]["type"] != $e["type"] || $lex[$i]["value"] != $e["value"]) {
+        carrot_and_error("Expected " . $e["value"] . " but found " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
+        return false;
+    }
+    return true;
+}
+
+function semi_or_end(vec $lex, int $i, string $line): boolean {
+    if ($lex[$i]["type"] == TokenType::EOF) return true;
+    else if ($lex[$i]["type"] == TokenType::SYMBOL && $lex[$i]["value"] == ";" && $lex[++$i]["type"] == TokenType::EOF) return true;
+    carrot_and_error("Unexpected token: " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
+    return false;
+}
