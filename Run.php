@@ -67,20 +67,19 @@ function parse_and_execute(vec $lex, string $line, Map $class_map, $conn) {
     $L_PAREN = shape("type" => TokenType::SYMBOL, "value" => "(");
     $R_PAREN = shape("type" => TokenType::SYMBOL, "value" => ")");
 
+    $i = 1;
     switch ($lex[0]["type"]) {
     case TokenType::EOF:
         return;
     case TokenType::KEYWORD:
         switch ($lex[0]["value"]) {
         case "getClasses":
-            $i = 1; // Doing $i = 1 on all of these fo scalability later
             if (!match_exact($lex, $i, $line, $L_PAREN)) return;
             if (!match_exact($lex, ++$i, $line, $R_PAREN)) return;
             if (!semi_or_end($lex, ++$i, $line)) return; 
             echo json_encode($class_map, JSON_PRETTY_PRINT), "\n";
             return;
         case "getClass":
-            $i = 1;
             if (!match_exact($lex, $i, $line, $L_PAREN)) return;
             if (!($class_name = match_type($lex, ++$i, $line, TokenType::CLASS_ID))) return;
             if (!match_exact($lex, ++$i, $line, $R_PAREN)) return;
@@ -88,14 +87,12 @@ function parse_and_execute(vec $lex, string $line, Map $class_map, $conn) {
             echo json_encode($class_map[$class_name], JSON_PRETTY_PRINT), "\n";
             return;
         case "getClassNames":
-            $i = 1;
             if (!match_exact($lex, $i, $line, $L_PAREN)) return;
             if (!match_exact($lex, ++$i, $line, $R_PAREN)) return;
             if (!semi_or_end($lex, ++$i, $line)) return; 
             echo json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT), "\n";
             return;
         case "getAllObjects":
-            $i = 1;
             if (!match_exact($lex, $i, $line, $L_PAREN)) return;
             if (!($class_name = match_type($lex, ++$i, $line, TokenType::CLASS_ID))) return;
             if (!match_exact($lex, ++$i, $line, $R_PAREN)) return;
@@ -104,7 +101,6 @@ function parse_and_execute(vec $lex, string $line, Map $class_map, $conn) {
             print_query_result($result, $class_map, $class_name);
             return;
         case "new":
-            $i = 1;
             if (!($class_name = match_type($lex, $i, $line, TokenType::CLASS_ID))) return;
             if (!match_exact($lex, ++$i, $line, $L_PAREN)) return;
             // TODO: use class_map[class_name] to get a list of results
