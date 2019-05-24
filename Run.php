@@ -3,6 +3,7 @@
 include("Globals.php");
 include("Lex.php");
 
+echo stripslashes("\\n");
 $config_file = fopen('database.txt', 'r');
 if (!$config_file) {
     die($PROJECT_NAME . " Error: You must include a database.txt file with your MySQL database credentials.\n"
@@ -62,7 +63,11 @@ while (true) {
     if (count($lex) > 0) parse_and_execute($lex, $line, $class_map, $conn);
 }
 
-function parse_and_execute(vec$lex, string $line, Map $class_map, $conn) {
+function parse_and_execute(vec $lex, string $line, Map $class_map, $conn) {
+    /*
+    $i = 0;
+    echo "RET: ", parse_type($lex, &$i, $line, "nt"), "\n";
+     */
     $L_PAREN = shape("type" => TokenType::SYMBOL, "value" => "(");
     $R_PAREN = shape("type" => TokenType::SYMBOL, "value" => ")");
 
@@ -88,14 +93,14 @@ function parse_and_execute(vec$lex, string $line, Map $class_map, $conn) {
             return;
         case "getClassNames":
             $i = 1;
-            if (!match_exact($lex, ++$i, $line, $L_PAREN)) return;
+            if (!match_exact($lex, $i, $line, $L_PAREN)) return;
             if (!match_exact($lex, ++$i, $line, $R_PAREN)) return;
             if (!semi_or_end($lex, ++$i, $line)) return; 
             echo json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT), "\n";
             return;
         case "getAllObjects":
             $i = 1;
-            if (!match_exact($lex, ++$i, $line, $L_PAREN)) return;
+            if (!match_exact($lex, $i, $line, $L_PAREN)) return;
             if (!($class_name = match_type($lex, ++$i, $line, TokenType::CLASS_ID))) return;
             if (!match_exact($lex, ++$i, $line, $R_PAREN)) return;
             if (!semi_or_end($lex, ++$i, $line)) return; 
@@ -116,13 +121,30 @@ function parse_and_execute(vec$lex, string $line, Map $class_map, $conn) {
 }
 
 // return value if parsed correctly or false otherwise
-/* TODO
 function parse_type(vec $lex, int &$i, string $line, string $e) {
-    switch ($e) {
-    case: "int":
-
+    $token = $lex[$i++];
+    switch($token["type"]) {
+    case TokenType::CLASS_ID:
+        // TODO: INT_ID, OBJ_ID.ID.ID...ID
+        return false;
+    case TokenType::INT_LITERAL:
+        if ($ret = parse_type_int($token["value"], $e)) return $ret;
+        carrot_and_error("expected " . $e . " but found " . $token["value"], $line, $token["char_num"]);
+        return false;
+    }
 }
- */
+
+// return value if parsed correctly or false otherwise
+function parse_type_int(string $val, string $e) {
+    switch($e) {
+    case "int": return $val;
+    // TODO: these next 3 (implement overflow)
+    case "byte":
+    case "short":
+    case "long":
+    default: return false;
+    }
+}
 
 function print_query_result($result, Map $class_map, string $class_name) {
     $PRIM = new Set(vec["short", "byte", "int", "long", "float", "double", "char", "doule", "String"]);
