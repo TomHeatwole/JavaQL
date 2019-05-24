@@ -63,8 +63,8 @@ while (true) {
 }
 
 function parse_and_execute(vec$lex, string $line, Map $class_map, $conn) {
-    $PRIM = new Set(vec["short", "byte", "int", "long", "float", "double", "char", "doule"]);
-    // JavaQL primitives, not Java
+    $L_PAREN = shape("type" => TokenType::SYMBOL, "value" => "(");
+    $R_PAREN = shape("type" => TokenType::SYMBOL, "value" => ")");
 
     switch ($lex[0]["type"]) {
         case TokenType::EOF:
@@ -72,47 +72,54 @@ function parse_and_execute(vec$lex, string $line, Map $class_map, $conn) {
         case TokenType::KEYWORD:
             switch ($lex[0]["value"]) {
                 case "getClasses":
-                    if (!match_exact($lex, 1, $line, shape("type" => TokenType::SYMBOL, "value" => "("))) return;
-                    if (!match_exact($lex, 2, $line, shape("type" => TokenType::SYMBOL, "value" => ")"))) return;
+                    if (!match_exact($lex, 1, $line, $L_PAREN)) return;
+                    if (!match_exact($lex, 2, $line, $R_PAREN)) return;
                     if (!semi_or_end($lex, 3, $line)) return; 
                     echo json_encode($class_map, JSON_PRETTY_PRINT), "\n";
                     return;
                 case "getClass":
-                    if (!match_exact($lex, 1, $line, shape("type" => TokenType::SYMBOL, "value" => "("))) return;
+                    if (!match_exact($lex, 1, $line, $L_PAREN)) return;
                     if (!($class_name = match_type($lex, 2, $line, TokenType::CLASS_ID))) return;
-                    if (!match_exact($lex, 3, $line, shape("type" => TokenType::SYMBOL, "value" => ")"))) return;
+                    if (!match_exact($lex, 3, $line, $R_PAREN)) return;
                     if (!semi_or_end($lex, 4, $line)) return; 
                     echo json_encode($class_map[$class_name], JSON_PRETTY_PRINT), "\n";
                     return;
                 case "getClassNames":
-                    if (!match_exact($lex, 1, $line, shape("type" => TokenType::SYMBOL, "value" => "("))) return;
-                    if (!match_exact($lex, 2, $line, shape("type" => TokenType::SYMBOL, "value" => ")"))) return;
+                    if (!match_exact($lex, 1, $line, $L_PAREN)) return;
+                    if (!match_exact($lex, 2, $line, $R_PAREN)) return;
                     if (!semi_or_end($lex, 3, $line)) return; 
                     echo json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT), "\n";
                     return;
                 case "getAllObjects":
-                    if (!match_exact($lex, 1, $line, shape("type" => TokenType::SYMBOL, "value" => "("))) return;
+                    if (!match_exact($lex, 1, $line, $L_PAREN)) return;
                     if (!($class_name = match_type($lex, 2, $line, TokenType::CLASS_ID))) return;
-                    if (!match_exact($lex, 3, $line, shape("type" => TokenType::SYMBOL, "value" => ")"))) return;
+                    if (!match_exact($lex, 3, $line, $R_PAREN)) return;
                     if (!semi_or_end($lex, 4, $line)) return; 
-                    $print = vec[];
-                    $var_names = $class_map[$class_name]->toKeysArray();
-                    $var_types = $class_map[$class_name]->toValuesArray();
                     $result = mysqli_query($conn, "SELECT * FROM " . $class_name);
-                    while ($row = mysqli_fetch_row($result)) {
-                        $vars = dict[];
-                        for ($i = 1; $i < count($row); $i++) {
-                            $display_val = $row[$i];
-                            if ($var_types[$i - 1] == "boolean") $display_val = (boolean)$display_val;
-                            else if (!$PRIM->contains($var_types[$i - 1]))
-                                $display_val = $var_types[$i - 1] . "@" . $row[$i];
-                            $vars[$var_names[$i - 1]] = $display_val;
-                        }
-                        $print[] = $vars;
-                    }
-                    echo json_encode($print, JSON_PRETTY_PRINT), "\n";
+                    print_query_result($result, $class_map, $class_name);
             }
     }
+}
+
+function print_query_result($result, Map $class_map, string $class_name) {
+    $PRIM = new Set(vec["short", "byte", "int", "long", "float", "double", "char", "doule"]);
+    // JavaQL primitives, not Java
+
+    $print = vec[];
+    $var_names = $class_map[$class_name]->toKeysArray();
+    $var_types = $class_map[$class_name]->toValuesArray();
+    while ($row = mysqli_fetch_row($result)) {
+        $vars = dict[];
+        for ($i = 1; $i < count($row); $i++) {
+            $display_val = $row[$i];
+            if ($var_types[$i - 1] == "boolean") $display_val = (boolean)$display_val;
+            else if (!$PRIM->contains($var_types[$i - 1]))
+                $display_val = $var_types[$i - 1] . "@" . $row[$i];
+            $vars[$var_names[$i - 1]] = $display_val;
+        }
+        $print[] = $vars;
+    }
+    echo json_encode($print, JSON_PRETTY_PRINT), "\n";
 }
 
 // Returns value of matched type on success or false on failure
