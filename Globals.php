@@ -1,9 +1,28 @@
 <?hh 
-    $PROJECT_NAME = "JavaQL";
-    $PROJECT_URL = "https://github.com/TomHeatwole/JavaQL/";
 
+enum TokenType: int {
+    INT_LITERAL = 0;
+    FLOAT_LITERAL = 1;
+    BOOLEAN_LITERAL = 2;
+    STRING_LITERAL = 3;
+    CHAR_LITERAL = 4;
+    ID = 5; // new ID and class variables
+    INT_ID = 6;
+    FLOAT_ID = 7;
+    BOOLEAN_ID = 8;
+    STRING_ID = 9;
+    CHAR_ID = 10;
+    CLASS_ID = 11;
+    SYMBOL = 12;
+    KEYWORD = 13;
+    EOF = 14;
+}
+
+$_GLOBALS = dict[
+    "PROJECT_NAME" => "JavaQL",
+    "PROJECT_URL" => "https://github.com/TomHeatwole/JavaQL/",
     // Map for 'Type' field 
-    $FROM_SQL_TYPE_MAP = dict[
+    "FROM_SQL_TYPE_MAP" => dict[
         "varchar(255)" => "String",
         "int(4)" => "byte",
         "int(6)" => "short",
@@ -13,6 +32,54 @@
         "tinyint(1)" => "boolean",
         "float" => "float",
         "double" => "double",
-    ];
-    $CLASS_MAP = new Map();
+    ],
+    "TOKEN_NAME_MAP" => new Map(dict[
+        TokenType::INT_LITERAL => "integer",
+        TokenType::FLOAT_LITERAL => "float",
+        TokenType::BOOLEAN_LITERAL => "boolean",
+        TokenType::STRING_LITERAL => "string",
+        TokenType::CHAR_LITERAL => "char",
+        TokenType::CLASS_ID => "class name",
+        TokenType::ID => "identifier",
+        TokenType::INT_ID => "integer",
+        TokenType::FLOAT_ID => "float",
+        TokenType::BOOLEAN_ID => "boolean",
+        TokenType::STRING_ID => "string",
+        TokenType::CHAR_ID => "char",
+        TokenType::SYMBOL => "symbol",
+        TokenType::KEYWORD => "keyword",
+        TokenType::EOF => "end of file",
+    ]),
+    "ESCAPE_CHARS" => new Set(vec["b", "t", "0", "n", "r", "\"", "'", "\\"]),
+    "KEYWORDS" => new Set(vec[
+        "getClasses",
+        "getClassNames",
+        "getClass",
+        "getAllObjects",
+        "getObjects",
+        "new",
+    ]),
+    "SYMBOLS" => new Set(vec[
+        "<",
+        ">",
+        "<=",
+        ">=",
+        "=",
+        "==",
+        "&&",
+        "||",
+        "(",
+        ")",
+        "[",
+        "]",
+        "{",
+        "}",
+        ";",
+        ".",
+        ","
+    ]),
+    "PRIM" => new Set(vec["short", "byte", "int", "long", "float", "double", "char", "doule", "String"]),
+    // JavaQL primitives, not Java
+
+];
 

@@ -6,13 +6,14 @@ include("Lex.php");
 echo stripslashes("\\n");
 $config_file = fopen('database.txt', 'r');
 if (!$config_file) {
-    die($PROJECT_NAME . " Error: You must include a database.txt file with your MySQL database credentials.\n"
-        . "Refer to the README: " . $PROJECT_URL . "\n");
+    die($_GLOBALS["PROJECT_NAME"] .
+        " Error: You must include a database.txt file with your MySQL database credentials.\n" .
+        "Refer to the README: " . $_GLOBALS["PROJECT_URL"] . "\n");
 }
 if (!(($host = fgets($config_file)) && ($username = fgets($config_file))
     && ($password = fgets($config_file)) && $database = fgets($config_file))) {
-    die($PROJECT_NAME . " Error: database.txt must contain 4 lines of your MySQL database credentials.\n"
-        . "Refer to the README: " . $PROJECT_URL . "\n");
+    die($_GLOBALS["PROJECT_NAME"] . " Error: database.txt must contain 4 lines of your MySQL database credentials.\n"
+        . "Refer to the README: " . $_GLOBALS["PROJECT_URL"] . "\n");
 } 
 fclose($config_file);
 
@@ -22,10 +23,10 @@ $conn = mysqli_connect(trim($host), trim($username), trim($password), trim($data
 
 // Check connection
 if (!$conn) { // In this case the connection attempt gave a warning
-    die($PROJECT_NAME . "Error: Failed to connect due to warning above.\n");
+    die($_GLOBALS["PROJECT_NAME"] . "Error: Failed to connect due to warning above.\n");
 }
 if ($conn->connect_error) {
-    die($PROJECT_NAME . "Error: Connection failed: " . $conn->connect_error . "\n");
+    die($_GLOBALS["PROJECT_NAME"] . "Error: Connection failed: " . $conn->connect_error . "\n");
 }
 echo "Connected successfully\n";
 
@@ -44,28 +45,29 @@ while ($row = mysqli_fetch_row($result)) {
             for ($i = 2; is_numeric($name[$i]); $i++) $table_name_length .= $name[$i];
             $type = substr($name, 1 + strlen($table_name_length), $table_name_length);
             $name = substr($name, 1 + strlen($table_name_length) + $table_name_length);
-        } else $type = $FROM_SQL_TYPE_MAP[$var['Type']];
+        } else $type = $_GLOBALS["FROM_SQL_TYPE_MAP"][$var['Type']];
         $vars[$name] = $type;
     }
     $class_map[$row[0]] = new Map($vars);
 }
 echo "Classes loaded\n\n";
 
-$class_map = new Map($class_map);
+$_GLOBALS["CLASS_MAP"] = new Map($class_map);
 
 $sym_table = new Map();
 
 // Begin CLI 
 while (true) {
-    $line = trim(readline($PROJECT_NAME . "> "));
+    $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
     if ($line == "q" || $line == "quit") break;
-    $lex = lex_command($line, $class_map, $sym_table);
-    if (count($lex) > 0) parse_and_execute($lex, $line, $class_map, $conn);
+    $lex = lex_command($_GLOBALS, $line, $sym_table);
+    if (count($lex) > 0) parse_and_execute($_GLOBALS, $lex, $line, $conn);
 }
 
-function parse_and_execute(vec $lex, string $line, Map $class_map, $conn) {
+function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
     $L_PAREN = shape("type" => TokenType::SYMBOL, "value" => "(");
     $R_PAREN = shape("type" => TokenType::SYMBOL, "value" => ")");
+    $class_map = $_GLOBALS["CLASS_MAP"];
 
     $i = 1;
     switch ($lex[0]["type"]) {
@@ -81,7 +83,7 @@ function parse_and_execute(vec $lex, string $line, Map $class_map, $conn) {
             return;
         case "getClass":
             if (!match_exact($lex, $i, $line, $L_PAREN)) return;
-            if (!($class_name = match_type($lex, ++$i, $line, TokenType::CLASS_ID))) return;
+            if (!($class_name = match_type($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return;
             if (!match_exact($lex, ++$i, $line, $R_PAREN)) return;
             if (!semi_or_end($lex, ++$i, $line)) return; 
             echo json_encode($class_map[$class_name], JSON_PRETTY_PRINT), "\n";
@@ -94,14 +96,14 @@ function parse_and_execute(vec $lex, string $line, Map $class_map, $conn) {
             return;
         case "getAllObjects":
             if (!match_exact($lex, $i, $line, $L_PAREN)) return;
-            if (!($class_name = match_type($lex, ++$i, $line, TokenType::CLASS_ID))) return;
+            if (!($class_name = match_type($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return;
             if (!match_exact($lex, ++$i, $line, $R_PAREN)) return;
             if (!semi_or_end($lex, ++$i, $line)) return; 
             $result = mysqli_query($conn, "SELECT * FROM " . $class_name);
-            print_query_result($result, $class_map, $class_name);
+            print_query_result($_GLOBALS, $result, $class_name);
             return;
         case "new":
-            if (!($class_name = match_type($lex, $i, $line, TokenType::CLASS_ID))) return;
+            if (!($class_name = match_type($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return;
             if (!match_exact($lex, ++$i, $line, $L_PAREN)) return;
             // TODO: use class_map[class_name] to get a list of results
             return;
@@ -161,19 +163,16 @@ function parse_type_float(string $val, string $e) {
     return false;
 }
 
-function print_query_result($result, Map $class_map, string $class_name) {
-    $PRIM = new Set(vec["short", "byte", "int", "long", "float", "double", "char", "doule", "String"]);
-    // JavaQL primitives, not Java
-
+function print_query_result(dict $_GLOBALS, $result, string $class_name) {
     $print = vec[];
-    $var_names = $class_map[$class_name]->toKeysArray();
-    $var_types = $class_map[$class_name]->toValuesArray();
+    $var_names = $_GLOBALS["CLASS_MAP"][$class_name]->toKeysArray();
+    $var_types = $_GLOBALS["CLASS_MAP"][$class_name]->toValuesArray();
     while ($row = mysqli_fetch_row($result)) {
         $vars = dict[];
         for ($i = 1; $i < count($row); $i++) {
             $display_val = $row[$i];
             if ($var_types[$i - 1] == "boolean") $display_val = (boolean)$display_val;
-            else if (!$PRIM->contains($var_types[$i - 1]))
+            else if (!$_GLOBALS["PRIM"]->contains($var_types[$i - 1]))
                 $display_val = $var_types[$i - 1] . "@" . $row[$i];
             $vars[$var_names[$i - 1]] = $display_val;
         }
@@ -183,31 +182,11 @@ function print_query_result($result, Map $class_map, string $class_name) {
 }
 
 // Returns value of matched type on success or false on failure
-function match_type(vec $lex, int $i, string $line, TokenType $e) {
-    $TOKEN_NAME_MAP = new Map(dict[
-        /*
-        TokenType::INT_LITERAL => "integer",
-        TokenType::FLOAT_LITERAL => "float",
-        TokenType::BOOLEAN_LITERAL => "boolean",
-        TokenType::STRING_LITERAL => "string",
-        TokenType::CHAR_LITERAL => "char",
-         */
-        TokenType::CLASS_ID => "class name",
-        /*
-        TokenType::ID => "identifier",
-        TokenType::INT_ID => "integer",
-        TokenType::FLOAT_ID => "float",
-        TokenType::BOOLEAN_ID => "boolean",
-        TokenType::STRING_ID => "string",
-        TokenType::CHAR_ID => "char",
-        TokenType::SYMBOL => "symbol",
-        TokenType::KEYWORD => "keyword",
-        TokenType::EOF => "end of file",
-         */
-    ]);
+function match_type(dict $_GLOBALS, vec $lex, int $i, string $line, TokenType $e) {
 
     if ($lex[$i]["type"] != $e) {
-        carrot_and_error("expected " . $TOKEN_NAME_MAP[$e] . " but found " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
+        carrot_and_error("expected " . $_GLOBALS["TOKEN_NAME_MAP"][$e] .
+            " but found " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
         return false;
     }
     return $lex[$i]["value"];

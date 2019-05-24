@@ -2,25 +2,6 @@
 
 include("Globals.php");
 
-// TODO: Decide whether to break up KEYWORD into separate tokens or combine SYMBOL into one token
-enum TokenType: int {
-    INT_LITERAL = 0;
-    FLOAT_LITERAL = 1;
-    BOOLEAN_LITERAL = 2;
-    STRING_LITERAL = 3;
-    CHAR_LITERAL = 4;
-    ID = 5; // new ID and class variables
-    INT_ID = 6;
-    FLOAT_ID = 7;
-    BOOLEAN_ID = 8;
-    STRING_ID = 9;
-    CHAR_ID = 10;
-    CLASS_ID = 11;
-    SYMBOL = 12;
-    KEYWORD = 13;
-    EOF = 14;
-}
-
 function carrot_pointer(string $line, int $index) {
     echo $line, "\n", str_repeat(" ", $index), "^\n";
 }
@@ -38,21 +19,10 @@ function carrot_and_error(string $message, string $line, int $index): vec {
 // For CLI commands
 // No need to worry about comments here
 function lex_command(
+    dict $_GLOBALS,
     string $line,
-    Map $class_map,
     Map $sym_table,
 ): vec<shape("type" => TokenType, "value" => string, "char_num" => int)> {
-    $ESCAPE_CHARS = new Set(vec["b", "t", "0", "n", "r", "\"", "'", "\\"]);
-    $KEYWORDS = new Set(vec[
-        "getClasses",
-        "getClassNames",
-        "getClass",
-        "getAllObjects",
-        "getObjects",
-        "new",
-    ]);
-    $SYMBOLS = new Set(vec["<", ">", "<=", ">=", "=", "==", "&&", "||", "(", ")", "[", "]", "{", "}", ";", ".", ","]);
-
     $ret = vec[];
     // For loop starts on beginning of new token attempt
     for ($i = 0; $i < strlen($line); $i++) {
@@ -67,9 +37,9 @@ function lex_command(
             $value = substr($line, $start, $i - $start + 1);
             // TODO: Might need to change to lexing to specific keyword tokentype
             $type = TokenType::ID;
-            if ($KEYWORDS->contains($value)) $type = TokenType::KEYWORD;
+            if ($_GLOBALS["KEYWORDS"]->contains($value)) $type = TokenType::KEYWORD;
             else if ($value == "true" || $value == "false") $type = TokenType::BOOLEAN_LITERAL;
-            else if ($class_map->containsKey($value)) $type = TokenType::CLASS_ID;
+            else if ($_GLOBALS["CLASS_MAP"]->containsKey($value)) $type = TokenType::CLASS_ID;
             // else symbol table
             $ret[] = shape("type" => $type, "value" => $value, "char_num" => $start);
 
@@ -102,7 +72,7 @@ function lex_command(
             if ($c == "'") return carrot_and_error("empty char literal", $line, $start);
             if ($c == "\\") { // TODO: Add support for unicode escape sequences
                 if ($i + 2 >= strlen($line)) return carrot_and_error("unclosed char literal", $line, $start);
-                if ($line[$i += 2] != "'" || !$ESCAPE_CHARS->contains($line[$i - 1]))
+                if ($line[$i += 2] != "'" || !$_GLOBALS["ESCAPE_CHARS"]->contains($line[$i - 1]))
                     return carrot_and_error("invalid char literal", $line, $start);
             } else {
                 if ($i + 1 >= strlen($line)) return carrot_and_error("unclosed char literal", $line, $start);
@@ -138,8 +108,8 @@ function lex_command(
 
         // Symbols 
         } else {
-            if ($i + 1 == strlen($line) || !$SYMBOLS->contains($line[$i] . $line[$i + 1])) {
-                if ($SYMBOLS->contains($line[$i]))
+            if ($i + 1 == strlen($line) || !$_GLOBALS["SYMBOLS"]->contains($line[$i] . $line[$i + 1])) {
+                if ($_GLOBALS["SYMBOLS"]->contains($line[$i]))
                     $ret[] = shape("type" => TokenType::SYMBOL, "value" => $line[$i], "char_num" => $i);
                 else return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i);
             } else $ret[] = shape("type" => TokenType::SYMBOL, "value" => $line[$i] . $line[++$i], "char_num" => $i - 1);
