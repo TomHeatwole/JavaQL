@@ -64,10 +64,6 @@ while (true) {
 }
 
 function parse_and_execute(vec $lex, string $line, Map $class_map, $conn) {
-    /*
-    $i = 0;
-    echo "RET: ", parse_type($lex, &$i, $line, "nt"), "\n";
-     */
     $L_PAREN = shape("type" => TokenType::SYMBOL, "value" => "(");
     $R_PAREN = shape("type" => TokenType::SYMBOL, "value" => ")");
 
@@ -129,9 +125,26 @@ function parse_type(vec $lex, int &$i, string $line, string $e) {
         return false;
     case TokenType::INT_LITERAL:
         if ($ret = parse_type_int($token["value"], $e)) return $ret;
-        carrot_and_error("expected " . $e . " but found " . $token["value"], $line, $token["char_num"]);
-        return false;
+        return expected_but_found($token, $line, $e);
+    case TokenType::FLOAT_LITERAL:
+        if ($ret = parse_type_float($token["value"], $e)) return $ret;
+        return expected_but_found($token, $line, $e);
+    case TokenType::CHAR_LITERAL:
+        if ($e == "char") return clean_literal($token["value"]);
+        return expected_but_found($token, $line, $e);
+    case TokenType::STRING_LITERAL:
+        if ($e == "string") return clean_literal($token["value"]);
+        return expected_but_found($token, $line, $e);
+    case TokenType::BOOLEAN_LITERAL:
+        if ($e == "boolean") return $token["value"];
+        return expected_but_found($token, $line, $e);
+    default: return expected_but_found($token, $line, $e);
     }
+}
+
+function expected_but_found($token, string $line, string $e): boolean {
+    carrot_and_error("expected " . $e . " but found " . $token["value"], $line, $token["char_num"]);
+    return false;
 }
 
 // return value if parsed correctly or false otherwise
@@ -144,6 +157,12 @@ function parse_type_int(string $val, string $e) {
     case "long":
     default: return false;
     }
+}
+
+function parse_type_float(string $val, string $e) {
+    if ($e == "double" || $e == "float") return $val;
+    // TODO: Figure out how overflow works for double --> float
+    return false;
 }
 
 function print_query_result($result, Map $class_map, string $class_name) {
@@ -213,3 +232,6 @@ function semi_or_end(vec $lex, int $i, string $line): boolean {
     return false;
 }
 
+function clean_literal(string $lit): string {
+    return substr($lit, 1, strlen($lit) - 2);
+}
