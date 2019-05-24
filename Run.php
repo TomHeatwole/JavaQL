@@ -67,42 +67,65 @@ function parse_and_execute(vec$lex, string $line, Map $class_map, $conn) {
     $R_PAREN = shape("type" => TokenType::SYMBOL, "value" => ")");
 
     switch ($lex[0]["type"]) {
-        case TokenType::EOF:
+    case TokenType::EOF:
+        return;
+    case TokenType::KEYWORD:
+        switch ($lex[0]["value"]) {
+        case "getClasses":
+            $i = 1; // Doing $i = 1 on all of these fo scalability later
+            if (!match_exact($lex, $i, $line, $L_PAREN)) return;
+            if (!match_exact($lex, ++$i, $line, $R_PAREN)) return;
+            if (!semi_or_end($lex, ++$i, $line)) return; 
+            echo json_encode($class_map, JSON_PRETTY_PRINT), "\n";
             return;
-        case TokenType::KEYWORD:
-            switch ($lex[0]["value"]) {
-                case "getClasses":
-                    if (!match_exact($lex, 1, $line, $L_PAREN)) return;
-                    if (!match_exact($lex, 2, $line, $R_PAREN)) return;
-                    if (!semi_or_end($lex, 3, $line)) return; 
-                    echo json_encode($class_map, JSON_PRETTY_PRINT), "\n";
-                    return;
-                case "getClass":
-                    if (!match_exact($lex, 1, $line, $L_PAREN)) return;
-                    if (!($class_name = match_type($lex, 2, $line, TokenType::CLASS_ID))) return;
-                    if (!match_exact($lex, 3, $line, $R_PAREN)) return;
-                    if (!semi_or_end($lex, 4, $line)) return; 
-                    echo json_encode($class_map[$class_name], JSON_PRETTY_PRINT), "\n";
-                    return;
-                case "getClassNames":
-                    if (!match_exact($lex, 1, $line, $L_PAREN)) return;
-                    if (!match_exact($lex, 2, $line, $R_PAREN)) return;
-                    if (!semi_or_end($lex, 3, $line)) return; 
-                    echo json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT), "\n";
-                    return;
-                case "getAllObjects":
-                    if (!match_exact($lex, 1, $line, $L_PAREN)) return;
-                    if (!($class_name = match_type($lex, 2, $line, TokenType::CLASS_ID))) return;
-                    if (!match_exact($lex, 3, $line, $R_PAREN)) return;
-                    if (!semi_or_end($lex, 4, $line)) return; 
-                    $result = mysqli_query($conn, "SELECT * FROM " . $class_name);
-                    print_query_result($result, $class_map, $class_name);
-            }
+        case "getClass":
+            $i = 1;
+            if (!match_exact($lex, $i, $line, $L_PAREN)) return;
+            if (!($class_name = match_type($lex, ++$i, $line, TokenType::CLASS_ID))) return;
+            if (!match_exact($lex, ++$i, $line, $R_PAREN)) return;
+            if (!semi_or_end($lex, ++$i, $line)) return; 
+            echo json_encode($class_map[$class_name], JSON_PRETTY_PRINT), "\n";
+            return;
+        case "getClassNames":
+            $i = 1;
+            if (!match_exact($lex, ++$i, $line, $L_PAREN)) return;
+            if (!match_exact($lex, ++$i, $line, $R_PAREN)) return;
+            if (!semi_or_end($lex, ++$i, $line)) return; 
+            echo json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT), "\n";
+            return;
+        case "getAllObjects":
+            $i = 1;
+            if (!match_exact($lex, ++$i, $line, $L_PAREN)) return;
+            if (!($class_name = match_type($lex, ++$i, $line, TokenType::CLASS_ID))) return;
+            if (!match_exact($lex, ++$i, $line, $R_PAREN)) return;
+            if (!semi_or_end($lex, ++$i, $line)) return; 
+            $result = mysqli_query($conn, "SELECT * FROM " . $class_name);
+            print_query_result($result, $class_map, $class_name);
+            return;
+        case "new":
+            $i = 1;
+            if (!($class_name = match_type($lex, $i, $line, TokenType::CLASS_ID))) return;
+            if (!match_exact($lex, ++$i, $line, $L_PAREN)) return;
+            // TODO: use class_map[class_name] to get a list of results
+            return;
+        }
+    default:
+        carrot_and_error("unexpected token: " . $lex[0]["value"], $line, 0);
+        return;
     }
 }
 
+// return value if parsed correctly or false otherwise
+/* TODO
+function parse_type(vec $lex, int &$i, string $line, string $e) {
+    switch ($e) {
+    case: "int":
+
+}
+ */
+
 function print_query_result($result, Map $class_map, string $class_name) {
-    $PRIM = new Set(vec["short", "byte", "int", "long", "float", "double", "char", "doule"]);
+    $PRIM = new Set(vec["short", "byte", "int", "long", "float", "double", "char", "doule", "String"]);
     // JavaQL primitives, not Java
 
     $print = vec[];

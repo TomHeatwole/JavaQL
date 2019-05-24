@@ -51,7 +51,7 @@ function lex_command(
         "getObjects",
         "new",
     ]);
-    $SYMBOLS = new Set(vec["<", ">", "<=", ">=", "=", "==", "&&", "||", "(", ")", "[", "]", "{", "}", ";", "."]);
+    $SYMBOLS = new Set(vec["<", ">", "<=", ">=", "=", "==", "&&", "||", "(", ")", "[", "]", "{", "}", ";", ".", ","]);
 
     $ret = vec[];
     // For loop starts on beginning of new token attempt
