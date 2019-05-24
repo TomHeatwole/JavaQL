@@ -78,7 +78,7 @@ $_GLOBALS = dict[
         ".",
         ","
     ]),
-    "PRIM" => new Set(vec["short", "byte", "int", "long", "float", "double", "char", "doule", "String"]),
+    "PRIM" => new Set(vec["short", "byte", "int", "long", "float", "double", "char", "String"]),
     // JavaQL primitives, not Java
 
 ];
