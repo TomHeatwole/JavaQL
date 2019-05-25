@@ -67,6 +67,7 @@ while (true) {
 function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
     $L_PAREN = shape("type" => TokenType::SYMBOL, "value" => "(");
     $R_PAREN = shape("type" => TokenType::SYMBOL, "value" => ")");
+    $COMMA = shape("type" => TokenType::SYMBOL, "value" => ",");
     $class_map = $_GLOBALS["CLASS_MAP"];
 
     $i = 1;
@@ -105,7 +106,22 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
         case "new":
             if (!($class_name = match_type($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return;
             if (!match_exact($lex, ++$i, $line, $L_PAREN)) return;
-            // TODO: use class_map[class_name] to get a list of results
+            $var_types = $class_map[$class_name]->toValuesArray();
+            $var_values = vec[];
+            $i++;
+            for ($j = 0; $j < count($var_types); $j++) {
+                if (!($var_values[] = parse_type($lex, &$i, $line, $var_types[$j]))) {
+                    echo $class_name, " constructor espects the following parameters: (";
+                    $var_names = $class_map[$class_name]->toKeysArray();
+                    for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
+                    echo $var_types[count($var_names) - 1], " ", $var_names[count($var_names) - 1], ")\n";
+                    return;
+                }
+                if ($j + 1 < count($var_types) && !match_exact($lex, $i++, $line, $COMMA)) return;
+            }
+            if (!match_exact($lex, $i, $line, $R_PAREN)) return;
+            if (!semi_or_end($lex, ++$i, $line)) return;
+            // TODO: update MYSQL on valid case here
             return;
         }
     default:
@@ -116,6 +132,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
 
 // return value if parsed correctly or false otherwise
 function parse_type(vec $lex, int &$i, string $line, string $e) {
+    // TODO: Implement default
     $token = $lex[$i++];
     switch($token["type"]) {
     case TokenType::CLASS_ID:
@@ -131,12 +148,13 @@ function parse_type(vec $lex, int &$i, string $line, string $e) {
         if ($e == "char") return clean_literal($token["value"]);
         return expected_but_found($token, $line, $e);
     case TokenType::STRING_LITERAL:
-        if ($e == "string") return clean_literal($token["value"]);
+        if ($e == "String") return clean_literal($token["value"]);
         return expected_but_found($token, $line, $e);
     case TokenType::BOOLEAN_LITERAL:
         if ($e == "boolean") return $token["value"];
         return expected_but_found($token, $line, $e);
     default: return expected_but_found($token, $line, $e);
+        // TODO: OBJ_ID
     }
 }
 
@@ -210,3 +228,4 @@ function semi_or_end(vec $lex, int $i, string $line): boolean {
 function clean_literal(string $lit): string {
     return substr($lit, 1, strlen($lit) - 2);
 }
+

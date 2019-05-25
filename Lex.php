@@ -39,6 +39,7 @@ function lex_command(
             $type = TokenType::ID;
             if ($_GLOBALS["KEYWORDS"]->contains($value)) $type = TokenType::KEYWORD;
             else if ($value == "true" || $value == "false") $type = TokenType::BOOLEAN_LITERAL;
+            else if ($value == "null") $type = TokenType::NULL_LITERAL;
             else if ($_GLOBALS["CLASS_MAP"]->containsKey($value)) $type = TokenType::CLASS_ID;
             // else symbol table
             $ret[] = shape("type" => $type, "value" => $value, "char_num" => $start);

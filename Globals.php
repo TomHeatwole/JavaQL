@@ -6,16 +6,17 @@ enum TokenType: int {
     BOOLEAN_LITERAL = 2;
     STRING_LITERAL = 3;
     CHAR_LITERAL = 4;
-    ID = 5; // new ID and class variables
-    INT_ID = 6;
+    NULL_LITERAL = 5;
+    ID = 6; // new ID and class variables
     FLOAT_ID = 7;
     BOOLEAN_ID = 8;
     STRING_ID = 9;
-    CHAR_ID = 10;
+    INT_ID = 10;
     CLASS_ID = 11;
-    SYMBOL = 12;
-    KEYWORD = 13;
-    EOF = 14;
+    CHAR_ID = 12;
+    SYMBOL = 13;
+    KEYWORD = 14;
+    EOF = 15;
 }
 
 $_GLOBALS = dict[
