@@ -101,8 +101,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
         $var_values = vec[];
         $i++;
         for ($j = 0; $j < count($var_types); $j++) {
-            // === false because edge case with empty string
-            if ($var_values[] = parse_type($lex, &$i, $line, $var_types[$j]) === false) {
+            if (!$var_values[] = parse_type($lex, &$i, $line, $var_types[$j])) {
                 echo $class_name, " constructor expects the following parameters: (";
                 $var_names = $class_map[$class_name]->toKeysArray();
                 for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
@@ -112,7 +111,9 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
             if ($j + 1 < count($var_types) && !match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return;
         }
         if (!r_paren_semi($_GLOBALS, $lex, $i, $line)) return;
-        // TODO: update MYSQL on valid case here
+        $query = "INSERT INTO " . $class_name . " VALUES (default";
+        for ($j = 0; $j < count($var_types); $j++) $query .= ", " . $var_values[$j];
+        if (!mysqli_query($conn, $query . ")")) echo "Error: an unknown MySQL error occurred\n";
         return;
     default:
         carrot_and_error("unexpected token: " . $lex[0]["value"], $line, 0);
@@ -136,10 +137,10 @@ function parse_type(vec $lex, int &$i, string $line, string $e) {
         if ($ret = parse_type_float($token["value"], $e)) return $ret;
         return expected_but_found($token, $line, $e);
     case TokenType::CHAR_LITERAL:
-        if ($e == "char") return clean_literal($token["value"]);
+        if ($e == "char") return $token["value"];
         return expected_but_found($token, $line, $e);
     case TokenType::STRING_LITERAL:
-        if ($e == "String") return clean_literal($token["value"]);
+        if ($e == "String") return $token["value"];
         return expected_but_found($token, $line, $e);
     case TokenType::BOOLEAN_LITERAL:
         if ($e == "boolean") return $token["value"];
@@ -211,7 +212,9 @@ function semi_or_end(vec $lex, int $i, string $line): boolean {
     return false;
 }
 
+/*
 function clean_literal(string $lit): string {
     return substr($lit, 1, strlen($lit) - 2);
 }
+ */
 
