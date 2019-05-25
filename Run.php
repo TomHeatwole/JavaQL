@@ -73,24 +73,24 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
         return;
     case TokenType::M_GET_CLASSES:
         if (!match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
-        r_paren_semi($_GLOBALS, $lex, ++$i, $line);
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
         echo json_encode($class_map, JSON_PRETTY_PRINT), "\n";
         return;
     case TokenType::M_GET_CLASS:
         if (!match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
         if (!($class_name = match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return;
-        r_paren_semi($_GLOBALS, $lex, ++$i, $line);
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
         echo json_encode($class_map[$class_name], JSON_PRETTY_PRINT), "\n";
         return;
     case TokenType::M_GET_CLASS_NAMES:
         if (!match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
-        r_paren_semi($_GLOBALS, $lex, ++$i, $line);
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
         echo json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT), "\n";
         return;
     case TokenType::M_GET_ALL_OBJECTS:
         if (!match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
         if (!($class_name = match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return;
-        r_paren_semi($_GLOBALS, $lex, ++$i, $line);
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
         $result = mysqli_query($conn, "SELECT * FROM " . $class_name);
         print_query_result($_GLOBALS, $result, $class_name);
         return;
@@ -101,8 +101,9 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
         $var_values = vec[];
         $i++;
         for ($j = 0; $j < count($var_types); $j++) {
-            if (!($var_values[] = parse_type($lex, &$i, $line, $var_types[$j]))) {
-                echo $class_name, " constructor espects the following parameters: (";
+            // === false because edge case with empty string
+            if ($var_values[] = parse_type($lex, &$i, $line, $var_types[$j]) === false) {
+                echo $class_name, " constructor expects the following parameters: (";
                 $var_names = $class_map[$class_name]->toKeysArray();
                 for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
                 echo $var_types[count($var_names) - 1], " ", $var_names[count($var_names) - 1], ")\n";
@@ -110,7 +111,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
             }
             if ($j + 1 < count($var_types) && !match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return;
         }
-        r_paren_semi($_GLOBALS, $lex, $i, $line);
+        if (!r_paren_semi($_GLOBALS, $lex, $i, $line)) return;
         // TODO: update MYSQL on valid case here
         return;
     default:
