@@ -73,28 +73,24 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
         return;
     case TokenType::M_GET_CLASSES:
         if (!match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
-        if (!match($_GLOBALS, $lex, ++$i, $line, TokenType::R_PAREN)) return;
-        if (!semi_or_end($lex, ++$i, $line)) return; 
+        r_paren_semi($_GLOBALS, $lex, ++$i, $line);
         echo json_encode($class_map, JSON_PRETTY_PRINT), "\n";
         return;
     case TokenType::M_GET_CLASS:
         if (!match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
         if (!($class_name = match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return;
-        if (!match($_GLOBALS, $lex, ++$i, $line, TokenType::R_PAREN)) return;
-        if (!semi_or_end($lex, ++$i, $line)) return; 
+        r_paren_semi($_GLOBALS, $lex, ++$i, $line);
         echo json_encode($class_map[$class_name], JSON_PRETTY_PRINT), "\n";
         return;
     case TokenType::M_GET_CLASS_NAMES:
         if (!match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
-        if (!match($_GLOBALS, $lex, ++$i, $line, TokenType::R_PAREN)) return;
-        if (!semi_or_end($lex, ++$i, $line)) return; 
+        r_paren_semi($_GLOBALS, $lex, ++$i, $line);
         echo json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT), "\n";
         return;
     case TokenType::M_GET_ALL_OBJECTS:
         if (!match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
         if (!($class_name = match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return;
-        if (!match($_GLOBALS, $lex, ++$i, $line, TokenType::R_PAREN)) return;
-        if (!semi_or_end($lex, ++$i, $line)) return; 
+        r_paren_semi($_GLOBALS, $lex, ++$i, $line);
         $result = mysqli_query($conn, "SELECT * FROM " . $class_name);
         print_query_result($_GLOBALS, $result, $class_name);
         return;
@@ -114,8 +110,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
             }
             if ($j + 1 < count($var_types) && !match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return;
         }
-        if (!match($_GLOBALS, $lex, $i, $line, TokenType::R_PAREN)) return;
-        if (!semi_or_end($lex, ++$i, $line)) return;
+        r_paren_semi($_GLOBALS, $lex, $i, $line);
         // TODO: update MYSQL on valid case here
         return;
     default:
@@ -131,6 +126,7 @@ function parse_type(vec $lex, int &$i, string $line, string $e) {
     switch($token["type"]) {
     case TokenType::CLASS_ID:
         // TODO: INT_ID, OBJ_ID.ID.ID...ID
+        echo "NOT IMPLEMENTED\n";
         return false;
     case TokenType::INT_LITERAL:
         if ($ret = parse_type_int($token["value"], $e)) return $ret;
@@ -193,6 +189,10 @@ function print_query_result(dict $_GLOBALS, $result, string $class_name) {
     echo json_encode($print, JSON_PRETTY_PRINT), "\n";
 }
 
+function r_paren_semi(dict $_GLOBALS, $lex, int $i, string $line): boolean {
+    return (match($_GLOBALS, $lex, $i, $line, TokenType::R_PAREN) && semi_or_end($lex, ++$i, $line));
+}
+
 // Returns value of matched type on success or false on failure
 function match(dict $_GLOBALS, vec $lex, int $i, string $line, TokenType $e) {
     if ($lex[$i]["type"] != $e) {
@@ -205,7 +205,7 @@ function match(dict $_GLOBALS, vec $lex, int $i, string $line, TokenType $e) {
 
 function semi_or_end(vec $lex, int $i, string $line): boolean {
     if ($lex[$i]["type"] == TokenType::EOF) return true;
-    else if ($lex[$i]["type"] == TokenType::SYMBOL && $lex[$i]["value"] == ";" && $lex[++$i]["type"] == TokenType::EOF) return true;
+    else if ($lex[$i]["type"] == TokenType::SEMI && $lex[++$i]["type"] == TokenType::EOF) return true;
     carrot_and_error("unexpected token: " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
     return false;
 }
