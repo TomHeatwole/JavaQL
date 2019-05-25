@@ -101,7 +101,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
         $var_values = vec[];
         $i++;
         for ($j = 0; $j < count($var_types); $j++) {
-            if (!$var_values[] = parse_type($lex, &$i, $line, $var_types[$j])) {
+            if (!$var_values[] = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j])) {
                 echo $class_name, " constructor expects the following parameters: (";
                 $var_names = $class_map[$class_name]->toKeysArray();
                 for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
@@ -122,7 +122,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
 }
 
 // return value if parsed correctly or false otherwise
-function parse_type(vec $lex, int &$i, string $line, string $e) {
+function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) {
     // TODO: Implement default
     $token = $lex[$i++];
     switch($token["type"]) {
@@ -132,27 +132,22 @@ function parse_type(vec $lex, int &$i, string $line, string $e) {
         return false;
     case TokenType::INT_LITERAL:
         if ($ret = parse_type_int($token["value"], $e)) return $ret;
-        return expected_but_found($token, $line, $e);
+        return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::FLOAT_LITERAL:
         if ($ret = parse_type_float($token["value"], $e)) return $ret;
-        return expected_but_found($token, $line, $e);
+        return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::CHAR_LITERAL:
         if ($e == "char") return $token["value"];
-        return expected_but_found($token, $line, $e);
+        return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::STRING_LITERAL:
         if ($e == "String") return $token["value"];
-        return expected_but_found($token, $line, $e);
+        return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::BOOLEAN_LITERAL:
         if ($e == "boolean") return $token["value"];
-        return expected_but_found($token, $line, $e);
-    default: return expected_but_found($token, $line, $e);
+        return expected_but_found($_GLOBALS, $token, $line, $e);
+    default: return expected_but_found($_GLOBALS, $token, $line, $e);
         // TODO: OBJ_ID
     }
-}
-
-function expected_but_found($token, string $line, string $e): boolean {
-    carrot_and_error("expected " . $e . " but found " . $token["value"], $line, $token["char_num"]);
-    return false;
 }
 
 // return value if parsed correctly or false otherwise
@@ -197,12 +192,16 @@ function r_paren_semi(dict $_GLOBALS, $lex, int $i, string $line): boolean {
 
 // Returns value of matched type on success or false on failure
 function match(dict $_GLOBALS, vec $lex, int $i, string $line, TokenType $e) {
-    if ($lex[$i]["type"] != $e) {
-        carrot_and_error("expected " . $_GLOBALS["TOKEN_NAME_MAP"][$e] .
-            " but found " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
-        return false;
-    }
+    if ($lex[$i]["type"] != $e)
+        return expected_but_found($_GLOBALS, $lex[$i], $line, $_GLOBALS["TOKEN_NAME_MAP"][$e]);
     return $lex[$i]["value"];
+}
+
+
+function expected_but_found(dict $_GLOBALS, $token, string $line, string $e): boolean {
+    carrot_and_error("expected " . $e . " but found " .
+        $_GLOBALS["TOKEN_NAME_MAP"][$token["type"]], $line, $token["char_num"]);
+    return false;
 }
 
 function semi_or_end(vec $lex, int $i, string $line): boolean {
