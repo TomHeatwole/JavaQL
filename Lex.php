@@ -37,9 +37,7 @@ function lex_command(
             $value = substr($line, $start, $i - $start + 1);
             // TODO: Might need to change to lexing to specific keyword tokentype
             $type = TokenType::ID;
-            if ($_GLOBALS["KEYWORDS"]->contains($value)) $type = TokenType::KEYWORD;
-            else if ($value == "true" || $value == "false") $type = TokenType::BOOLEAN_LITERAL;
-            else if ($value == "null") $type = TokenType::NULL_LITERAL;
+            if ($_GLOBALS["KEYWORDS"]->containsKey($value)) $type = $_GLOBALS["KEYWORDS"][$value];
             else if ($_GLOBALS["CLASS_MAP"]->containsKey($value)) $type = TokenType::CLASS_ID;
             // else symbol table
             $ret[] = shape("type" => $type, "value" => $value, "char_num" => $start);
@@ -109,11 +107,14 @@ function lex_command(
 
         // Symbols 
         } else {
-            if ($i + 1 == strlen($line) || !$_GLOBALS["SYMBOLS"]->contains($line[$i] . $line[$i + 1])) {
-                if ($_GLOBALS["SYMBOLS"]->contains($line[$i]))
-                    $ret[] = shape("type" => TokenType::SYMBOL, "value" => $line[$i], "char_num" => $i);
+            if ($i + 1 == strlen($line) || !$_GLOBALS["SYMBOLS"]->containsKey($line[$i] . $line[$i + 1])) {
+                if ($_GLOBALS["SYMBOLS"]->containsKey($line[$i]))
+                    $ret[] = shape("type" => $_GLOBALS["SYMBOLS"][$line[$i]], "value" => $line[$i], "char_num" => $i);
                 else return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i);
-            } else $ret[] = shape("type" => TokenType::SYMBOL, "value" => $line[$i] . $line[++$i], "char_num" => $i - 1);
+            } else $ret[] = shape(
+                "type" => $_GLOBALS["SYMBOLS"][$line[$i] . $line[$i + 1]],
+                "value" => $line[$i] . $line[++$i], "char_num" => $i - 1
+            );
         } 
     }
     $ret[] = shape("type" => TokenType::EOF, "value" => "End of line", "char_num" => strlen($line));

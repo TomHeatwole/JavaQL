@@ -1,9 +1,0 @@
-getClasses();
-getClasses()
-getClass(zzz);
-getClass(zzz)
-getClassNames();
-getClassNames()
-getAllObjects(zzz);
-getAllObjects(zzz)
-q
