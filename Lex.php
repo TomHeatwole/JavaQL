@@ -21,7 +21,6 @@ function carrot_and_error(string $message, string $line, int $index): vec {
 function lex_command(
     dict $_GLOBALS,
     string $line,
-    Map $sym_table,
 ): vec<shape("type" => TokenType, "value" => string, "char_num" => int)> {
     $ret = vec[];
     // For loop starts on beginning of new token attempt

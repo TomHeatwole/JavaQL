@@ -48,24 +48,24 @@ $_GLOBALS = dict[
     // Map for 'Type' field 
     "FROM_SQL_TYPE_MAP" => dict[
         "varchar(255)" => "String",
-        "int(4)" => "byte",
-        "int(6)" => "short",
+        "tinyint(4)" => "byte",
+        "smallint(6)" => "short",
         "int(11)" => "int",
-        "int(20)" => "long",
+        "bigint(20)" => "long",
         "char(1)" => "char",
         "tinyint(1)" => "boolean",
         "float" => "float",
         "double" => "double",
     ],
     "TOKEN_NAME_MAP" => new Map(dict[
-        TokenType::INT_LITERAL => "integer",
+        TokenType::INT_LITERAL => "int",
         TokenType::FLOAT_LITERAL => "float",
         TokenType::BOOLEAN_LITERAL => "boolean",
         TokenType::STRING_LITERAL => "String",
         TokenType::CHAR_LITERAL => "char",
         TokenType::CLASS_ID => "class name",
         TokenType::ID => "unknown identifier",
-        TokenType::INT_ID => "integer",
+        TokenType::INT_ID => "int",
         TokenType::FLOAT_ID => "float",
         TokenType::BOOLEAN_ID => "boolean",
         TokenType::STRING_ID => "string",
@@ -87,7 +87,7 @@ $_GLOBALS = dict[
         TokenType::R_CURLY => "}",
         TokenType::SEMI => ";",
         TokenType::DOT => ".",
-        TokenType::COMMA => ","
+        TokenType::COMMA => ",",
     ]),
     "ESCAPE_CHARS" => new Set(vec["b", "t", "0", "n", "r", "\"", "'", "\\"]),
     "KEYWORDS" => new Map(dict[
@@ -118,10 +118,14 @@ $_GLOBALS = dict[
         "}" => TokenType::R_CURLY,
         ";" => TokenType::SEMI,
         "." => TokenType::DOT,
-        "," => TokenType::COMMA
+        "," => TokenType::COMMA,
     ]),
-    "PRIM" => new Set(vec["short", "byte", "int", "long", "float", "double", "char", "String"]),
-    // JavaQL primitives, not Java
-
+    "PRIM" => new Set(vec["short", "byte", "int", "long", "float", "double", "char", "String"]), // JavaQL primitives
+    "INT_MAX" => new Map(dict[
+        "byte" => 127,
+        "short" => 32767,
+        "int" => 2147483647,
+        "long" => 9223372036854775807,
+    ]),
 ];
 

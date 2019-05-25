@@ -3,7 +3,6 @@
 include("Globals.php");
 include("Lex.php");
 
-echo stripslashes("\\n");
 $config_file = fopen('database.txt', 'r');
 if (!$config_file) {
     die($_GLOBALS["PROJECT_NAME"] .
@@ -45,7 +44,7 @@ while ($row = mysqli_fetch_row($result)) {
             for ($i = 2; is_numeric($name[$i]); $i++) $table_name_length .= $name[$i];
             $type = substr($name, 1 + strlen($table_name_length), $table_name_length);
             $name = substr($name, 1 + strlen($table_name_length) + $table_name_length);
-        } else $type = $_GLOBALS["FROM_SQL_TYPE_MAP"][$var['Type']];
+        } else $type = $_GLOBALS["FROM_SQL_TYPE_MAP"][$var["Type"]];
         $vars[$name] = $type;
     }
     $class_map[$row[0]] = new Map($vars);
@@ -53,14 +52,13 @@ while ($row = mysqli_fetch_row($result)) {
 echo "Classes loaded\n\n";
 
 $_GLOBALS["CLASS_MAP"] = new Map($class_map);
-
-$sym_table = new Map();
+$_GLOBALS["SYMBOL_TABLE"] = new Map();
 
 // Begin CLI 
 while (true) {
     $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
     if ($line == "q" || $line == "quit") break;
-    $lex = lex_command($_GLOBALS, $line, $sym_table);
+    $lex = lex_command($_GLOBALS, $line);
     if (count($lex) > 0) parse_and_execute($_GLOBALS, $lex, $line, $conn);
 }
 
@@ -101,7 +99,9 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
         $var_values = vec[];
         $i++;
         for ($j = 0; $j < count($var_types); $j++) {
-            if (!$var_values[] = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j])) {
+            // === false to check for "0"
+            if (($var_values[] = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j])) === false) {
+                echo $var_values[$j];
                 echo $class_name, " constructor expects the following parameters: (";
                 $var_names = $class_map[$class_name]->toKeysArray();
                 for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
@@ -131,7 +131,18 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         echo "NOT IMPLEMENTED\n";
         return false;
     case TokenType::INT_LITERAL:
-        if ($ret = parse_type_int($token["value"], $e)) return $ret;
+        if ($_GLOBALS["INT_MAX"]->containsKey($e)) {
+            $max = $_GLOBALS["INT_MAX"][$e];
+            $int_val = (int)$token["value"];
+            // TODO: Figure out how to check for longs on a 32 bit machine
+            if ("" . $int_val != $token["value"])
+                carrot_and_error("Error: integer value too large", $line, $token["char_num"]);
+            else if ($int_val > $max || -$int_val > $max + 1)
+                carrot_and_error("Error: integer value " . $int_val .
+                " is too large for type " . $e, $line, $token["char_num"]); 
+            else return $token["value"];
+            return false;
+        }
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::FLOAT_LITERAL:
         if ($ret = parse_type_float($token["value"], $e)) return $ret;
@@ -147,18 +158,6 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         return expected_but_found($_GLOBALS, $token, $line, $e);
     default: return expected_but_found($_GLOBALS, $token, $line, $e);
         // TODO: OBJ_ID
-    }
-}
-
-// return value if parsed correctly or false otherwise
-function parse_type_int(string $val, string $e) {
-    switch($e) {
-    case "int": return $val;
-    // TODO: these next 3 (implement overflow)
-    case "byte":
-    case "short":
-    case "long":
-    default: return false;
     }
 }
 
