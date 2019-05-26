@@ -140,6 +140,14 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
         $_GLOBALS["SYMBOL_TABLE"][$name] = shape("type" => $e, "value" => $val);
         return;
     }
+    if ($_GLOBALS["VAR_IDS"]->contains($lex[0]["type"])) {
+        if ($lex[0]["type"] == TokenType::OBJ_ID) {
+            //TODO: check_end($lex, $i). Check for DOT match, etc
+        }
+        if (!must_end($lex, $i, $line)) return;
+        echo $_GLOBALS["SYMBOL_TABLE"][$lex[0]["value"]]["value"] . "\n";
+        return;
+    }
     return carrot_error_false("unexpected token: " . $lex[0]["value"], $line, 0);
 }
 

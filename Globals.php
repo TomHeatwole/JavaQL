@@ -139,8 +139,8 @@ $_GLOBALS = dict[
         "float" => 0,
         "double" => 0,
         "boolean" => false,
-        "String" => "",
-        "char" => "\0",
+        "String" => "\"\"",
+        "char" => "'\0'",
     ]),
     "VAR_IDS" => new Set(vec[
         TokenType::FLOAT_ID,
