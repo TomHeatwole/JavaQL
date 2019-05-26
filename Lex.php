@@ -122,15 +122,25 @@ function lex_command(
 
 function lex_number(string $line, int &$i, bool $decimal): shape("type" => TokenType, "value" => string) {
     $start = $i;
+    $e = false;
+    $invalid = false;
     for (; $i < strlen($line) - 1; $i++) {
         if ($line[$i + 1] == ".") {
-            if ($decimal) {
-                carrot_and_error("invalid decimal", $line, $i + 1);
-                $i = -1;
-                return shape();
-            }
+            if ($decimal || $e) $invalid = true;
             $decimal = true;
+        } else if ($line[$i + 1] == 'e' || $line[$i + 1] == "E") {
+            if ($e || ++$i + 1 == strlen($line)) $invalid = true;
+            else if (!is_numeric($line[$i + 1])) {
+                if (($line[$i + 1] != "-" && $line[$i + 1] != "+") ||
+                    ++$i + 1 == strlen($line) || !is_numeric($line[$i + 1])) $invalid = true;
+            }
+            $e = true;
         } else if (!is_numeric($line[$i + 1])) break;
+        if ($invalid) {
+            carrot_and_error("malformed number", $line, $start);
+            $i = -1;
+            return shape();
+        }
     }
     return shape(
         "type" => $decimal ? TokenType::FLOAT_LITERAL : TokenType::INT_LITERAL, 

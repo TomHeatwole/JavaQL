@@ -116,8 +116,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
         if (!mysqli_query($conn, $query . ")")) echo "Error: an unknown MySQL error occurred\n";
         return;
     default:
-        carrot_and_error("unexpected token: " . $lex[0]["value"], $line, 0);
-        return;
+        return carrot_error_false("unexpected token: " . $lex[0]["value"], $line, 0);
     }
 }
 
@@ -131,21 +130,36 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         echo "NOT IMPLEMENTED\n";
         return false;
     case TokenType::INT_LITERAL:
+        $int_val = (int)$token["value"];
+        if ($e == "float") {
+            if ($int_val <= $_GLOBALS["FLOAT_MAX"]) return $token["value"];
+            return carrot_error_false("int literal is too large for type float", $line, $token["char_num"]);
+        }
+        if ($e == "double") {
+            if ((double)$token["value"] != INF) return $token["value"];
+            return carrot_error_false("int literal is too large for type double", $line, $token["char_num"]);
+        }
         if ($_GLOBALS["INT_MAX"]->containsKey($e)) {
             $max = $_GLOBALS["INT_MAX"][$e];
-            $int_val = (int)$token["value"];
             // TODO: Figure out how to check for longs on a 32 bit machine
             if ("" . $int_val != $token["value"])
-                carrot_and_error("Error: integer value too large", $line, $token["char_num"]);
-            else if ($int_val > $max || -$int_val > $max + 1)
-                carrot_and_error("Error: integer value " . $int_val .
+                return carrot_error_false("integer value too large", $line, $token["char_num"]);
+            if ($int_val > $max || -$int_val > $max + 1)
+                return carrot_error_false("integer value " . $int_val .
                 " is too large for type " . $e, $line, $token["char_num"]); 
-            else return $token["value"];
-            return false;
+            return $token["value"];
         }
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::FLOAT_LITERAL:
-        if ($ret = parse_type_float($token["value"], $e)) return $ret;
+        // TODO: bring back parse_type_float and parse_type_int once we add the symbol table
+        $float_val = (double)$token["value"];
+        if ($float_val == INF)
+            return carrot_error_false("decimal literal is too large", $line, $token["char_num"]);
+        if ($e == "float")
+            if ($float_val > $_GLOBALS["FLOAT_MAX"])
+                return carrot_error_false("decimal literal is too large for type float", $line, $token["char_num"]);
+            return $token["value"];
+        if ($e == "double") return $token["value"];
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::CHAR_LITERAL:
         if ($e == "char") return $token["value"];
@@ -159,12 +173,6 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     default: return expected_but_found($_GLOBALS, $token, $line, $e);
         // TODO: OBJ_ID
     }
-}
-
-function parse_type_float(string $val, string $e) {
-    if ($e == "double" || $e == "float") return $val;
-    // TODO: Figure out how overflow works for double --> float
-    return false;
 }
 
 function print_query_result(dict $_GLOBALS, $result, string $class_name) {
@@ -196,7 +204,6 @@ function match(dict $_GLOBALS, vec $lex, int $i, string $line, TokenType $e) {
     return $lex[$i]["value"];
 }
 
-
 function expected_but_found(dict $_GLOBALS, $token, string $line, string $e): boolean {
     carrot_and_error("expected " . $e . " but found " .
         $_GLOBALS["TOKEN_NAME_MAP"][$token["type"]], $line, $token["char_num"]);
@@ -207,6 +214,10 @@ function semi_or_end(vec $lex, int $i, string $line): boolean {
     if ($lex[$i]["type"] == TokenType::EOF) return true;
     else if ($lex[$i]["type"] == TokenType::SEMI && $lex[++$i]["type"] == TokenType::EOF) return true;
     carrot_and_error("unexpected token: " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
+    return false;
+}
+function carrot_error_false(string $message, string $line, int $char_num) {
+    carrot_and_error($message, $line, $char_num);
     return false;
 }
 
