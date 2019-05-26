@@ -34,11 +34,15 @@ function lex_command(
                 if (!ctype_alpha($line[$i + 1]) && !is_numeric($line[$i + 1]) && $line[$i + 1] != "_") break;
             }
             $value = substr($line, $start, $i - $start + 1);
-            // TODO: Might need to change to lexing to specific keyword tokentype
             $type = TokenType::ID;
             if ($_GLOBALS["KEYWORDS"]->containsKey($value)) $type = $_GLOBALS["KEYWORDS"][$value];
             else if ($_GLOBALS["CLASS_MAP"]->containsKey($value)) $type = TokenType::CLASS_ID;
-            // else symbol table
+            else if ($_GLOBALS["SYMBOL_TABLE"]->containsKey($value)) {
+                $j_type = $_GLOBALS["SYMBOL_TABLE"][$value]["type"];
+                $type = $_GLOBALS["JAVA_TYPE_TO_ID"]->containsKey($j_type) ?
+                    $_GLOBALS["JAVA_TYPE_TO_ID"][$j_type] :
+                    TokenType::OBJ_ID;
+            }
             $ret[] = shape("type" => $type, "value" => $value, "char_num" => $start);
 
         // int or float literal
