@@ -182,10 +182,15 @@ function print_query_result(dict $_GLOBALS, $result, string $class_name) {
     while ($row = mysqli_fetch_row($result)) {
         $vars = dict[];
         for ($i = 1; $i < count($row); $i++) {
+            $type = $var_types[$i - 1];
             $display_val = $row[$i];
-            if ($var_types[$i - 1] == "boolean") $display_val = (boolean)$display_val;
-            else if (!$_GLOBALS["PRIM"]->contains($var_types[$i - 1]))
-                $display_val = $var_types[$i - 1] . "@" . $row[$i];
+            if ($type == "boolean") $display_val = (boolean)$display_val;
+            else if ($type == "double" || $type == "float") {
+                $display_val = str_replace("e", "E", $display_val);
+                $display_val = str_replace("+", "", $display_val);
+            }
+            else if (!$_GLOBALS["PRIM"]->contains($type))
+                $display_val = $type . "@" . $row[$i];
             $vars[$var_names[$i - 1]] = $display_val;
         }
         $print[] = $vars;
