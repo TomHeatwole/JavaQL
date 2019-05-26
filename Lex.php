@@ -116,7 +116,7 @@ function lex_command(
             );
         } 
     }
-    $ret[] = shape("type" => TokenType::EOF, "value" => "end of line", "char_num" => strlen($line));
+    $ret[] = shape("type" => TokenType::EOL, "value" => "end of line", "char_num" => strlen($line));
     return $ret;
 }
 
