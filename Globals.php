@@ -55,7 +55,6 @@ enum TokenType: int {
     EOL = 51;
 }
 
-
 $_GLOBALS = dict[
     "PROJECT_NAME" => "JavaQL",
     "PROJECT_URL" => "https://github.com/TomHeatwole/JavaQL/",
@@ -77,6 +76,7 @@ $_GLOBALS = dict[
         TokenType::BOOLEAN_LITERAL => "boolean",
         TokenType::STRING_LITERAL => "String",
         TokenType::CHAR_LITERAL => "char",
+        TokenType::NULL_LITERAL => "null",
         TokenType::CLASS_ID => "class name",
         TokenType::ID => "unknown identifier",
         TokenType::BYTE_ID => "byte",
@@ -128,6 +128,18 @@ $_GLOBALS = dict[
         TokenType::J_BOOLEAN => "boolean",
         TokenType::J_STRING => "String",
         TokenType::J_CHAR => "char",
+    ]),
+    "DEFAULTS" => new Map(dict[
+        "class" => null,
+        "byte" => 0,
+        "short" => 0,
+        "int" => 0,
+        "long" => 0,
+        "float" => 0,
+        "double" => 0,
+        "boolean" => false,
+        "String" => "",
+        "char" => "\0",
     ]),
     "VAR_IDS" => new Set(vec[
         TokenType::FLOAT_ID,

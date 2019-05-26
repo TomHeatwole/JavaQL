@@ -117,6 +117,8 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
         return;
     }
     if ($_GLOBALS["JAVA_TYPES"]->containsKey($lex[0]["type"])) {
+        $j_type = $_GLOBALS["JAVA_TYPES"][$lex[0]["type"]];
+        $e = ($j_type == "class") ? $lex[0]["value"] : $j_type;
         if ($lex[$i]["type"] == TokenType::CLASS_ID)
             return carrot_error_false($_GLOBALS["PROJECT_NAME"] .
                 " variables may not share names with classes", $line, $lex[$i]["char_num"]);
@@ -124,18 +126,17 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
             return carrot_error_false("variable " . $lex[$i]["value"] .
                 " is already defined", $line, $lex[$i]["char_num"]);
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::ID)) return;
+        $name = $lex[$i]["value"];
         if (check_end($lex, ++$i)) {
-            // TODO: sucess case
+            $_GLOBALS["SYMBOL_TABLE"][$name] = shape("type" => $e, "value" => $_GLOBALS["DEFAULTS"][$j_type]);
             return;
         }
         if ($lex[$i]["type"] != TokenType::ASSIGN)
             return carrot_error_false("expected end of command or = but found " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
-        $e = $_GLOBALS["JAVA_TYPES"][$lex[0]["type"]];
-        if ($e == "class"){} // TODO
         $i++;
         if (($val = parse_type($_GLOBALS, $lex, &$i, $line, $e)) == false) return;
         if (!must_end($lex, $i, $line)) return;
-        // TODO: sucess case
+        $_GLOBALS["SYMBOL_TABLE"][$name] = shape("type" => $e, "value" => $val);
         return;
     }
     return carrot_error_false("unexpected token: " . $lex[0]["value"], $line, 0);
