@@ -132,7 +132,8 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
             return;
         }
         if ($lex[$i]["type"] != TokenType::ASSIGN)
-            return carrot_error_false("expected end of command or = but found " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
+            return carrot_error_false("expected end of command or = but found "
+                . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
         $i++;
         if (($val = parse_type($_GLOBALS, $lex, &$i, $line, $e)) == false) return;
         if (!must_end($lex, $i, $line)) return;
@@ -147,8 +148,8 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     // TODO: Implement default
     $token = $lex[$i++];
     switch($token["type"]) {
-    case TokenType::CLASS_ID:
-        // TODO: INT_ID, OBJ_ID.ID.ID...ID
+    case TokenType::OBJ_ID:
+        // TODO: OBJ_ID.ID.ID...ID
         echo "NOT IMPLEMENTED\n";
         return false;
     case TokenType::INT_LITERAL:
@@ -173,7 +174,6 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         }
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::FLOAT_LITERAL:
-        // TODO: bring back parse_type_float and parse_type_int once we add the symbol table
         $float_val = (double)$token["value"];
         if ($float_val == INF)
             return carrot_error_false("decimal literal is too large", $line, $token["char_num"]);
@@ -193,12 +193,28 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     case TokenType::BOOLEAN_LITERAL:
         if ($e == "boolean") return $token["value"];
         return expected_but_found($_GLOBALS, $token, $line, $e);
+    case TokenType::BOOLEAN_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["boolean"]));
+    case TokenType::CHAR_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["char", "String"]));
+    case TokenType::STRING_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["String"]));
+    case TokenType::FLOAT_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["float", "double"]));
+    case TokenType::DOUBLE_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["double"]));
+    case TokenType::BYTE_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["byte", "short", "int", "long"]));
+    case TokenType::SHORT_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["short", "int", "long"]));
+    case TokenType::INT_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["int", "long"]));
+    case TokenType::LONG_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["long"]));
     default: return expected_but_found($_GLOBALS, $token, $line, $e);
-        // TODO: OBJ_ID
     }
 }
 
+function parse_id($_GLOBALS, $token, $line, $e, Set $accept) {
+    if ($accept->contains($e)) return $_GLOBALS["SYMBOL_TABLE"][$token["value"]]["value"];
+    echo $e, "\n";
+    var_dump($accept);
+    return expected_but_found($_GLOBALS, $token, $line, $e);
+}
+
 function print_query_result(dict $_GLOBALS, $result, string $class_name) {
+    // TODO: null as display_val, NULL -> null
     $print = vec[];
     $var_names = $_GLOBALS["CLASS_MAP"][$class_name]->toKeysArray();
     $var_types = $_GLOBALS["CLASS_MAP"][$class_name]->toValuesArray();
