@@ -52,7 +52,6 @@ echo "Classes loaded\n\n";
 $_GLOBALS["CONN"] = $_GLOBALS["CONN"];
 $_GLOBALS["CLASS_MAP"] = new Map($class_map);
 $_GLOBALS["SYMBOL_TABLE"] = new Map();
-//$_GLOBALS["SYMBOL_TABLE"]["example"] = shape("type" => "oklolhaha99", "value" => 1);
 
 // Begin CLI 
 while (true) {
@@ -80,7 +79,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
     case TokenType::M_GET_CLASS_NAMES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
-        return(json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT));
+        return end_parse(json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT));
     case TokenType::M_GET_ALL_OBJECTS:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return;
@@ -88,29 +87,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         $result = mysqli_query($_GLOBALS["CONN"], "SELECT * FROM " . $class_name);
         return end_parse(query_result_to_string($_GLOBALS, $result, $class_name));
     case TokenType::NEW_LITERAL:
-        if (!($class_name = must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return;
-        if (!must_match($_GLOBALS, $lex, ++$i, $line, TokenType::L_PAREN)) return;
-        $var_types = $class_map[$class_name]->toValuesArray();
-        $var_values = vec[];
-        $i++;
-        for ($j = 0; $j < count($var_types); $j++) {
-            // === false to check for "0"
-            if (($var_values[] = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j])) === false) {
-                echo "\n";
-                echo $class_name, " constructor expects the following parameters: (";
-                $var_names = $class_map[$class_name]->toKeysArray();
-                for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
-                return end_parse($var_types[count($var_names) - 1] . " " . $var_names[count($var_names) - 1] . ")");
-            }
-            if ($j + 1 < count($var_types) && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return;
-        }
-        if (!r_paren_semi($_GLOBALS, $lex, $i, $line)) return;
-        $query = "INSERT INTO " . $class_name . " VALUES (default";
-        for ($j = 0; $j < count($var_types); $j++) {
-            $query .= ", " . (($var_values[$j] ==- null) ? "null" : $var_values[$j]);
-        }
-        if (!mysqli_query($_GLOBALS["CONN"], $query . ")")) echo "Error: an unknown MySQL error occurred";
-        return;
+        return new_object($_GLOBALS, $lex, $i, $line, "");
     }
     if ($_GLOBALS["JAVA_TYPES"]->containsKey($lex[0]["type"])) {
         $j_type = $_GLOBALS["JAVA_TYPES"][$lex[0]["type"]];
@@ -129,7 +106,15 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         }
         if ($lex[$i]["type"] != TokenType::ASSIGN)
             return carrot_error_false("expected end of command or = but found "
-                . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
+                . $lex[$i]["value"], $line, $lex[$i]["char_num"]); // TODO: bad error message
+        if ($j_type == "class") {
+            if ($lex[++$i]["type"] == TokenType::NEW_LITERAL) {
+                if (!$new_val = new_object($_GLOBALS, $lex, ++$i, $line, $e)) return false;
+                $_GLOBALS["SYMBOL_TABLE"][$name] = shape("value" => $new_val, "type" => $e);
+                return;
+            }
+            return lex_error("NOT IMPLEMENTED");
+        }
         return assign_prim($_GLOBALS, $lex, ++$i, $e, $line, $name);
     }
     if ($_GLOBALS["VAR_IDS"]->contains($lex[0]["type"])) {
@@ -149,6 +134,40 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         return end_parse(get_display_val($_GLOBALS, $sym["type"], $sym["value"]));
     }
     return carrot_error_false("unexpected token: " . $lex[0]["value"], $line, 0);
+}
+
+// return false or value of new object
+function new_object(dict $_GLOBALS, vec $lex, int $i, string $line, string $e) {
+    $class_map = $_GLOBALS["CLASS_MAP"];
+    if (!($class_name = must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return false;
+    if ($e != "" && $e != $class_name)
+        return carrot_error_false("expected " . $e . " but found " . $class_name, $line, $lex[$i]["char_num"]);
+    if (!must_match($_GLOBALS, $lex, ++$i, $line, TokenType::L_PAREN)) return false;
+    $var_types = $class_map[$class_name]->toValuesArray();
+    $var_values = vec[];
+    $i++;
+    for ($j = 0; $j < count($var_types); $j++) {
+        // === false to check for "0"
+        if (($var_values[] = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j])) === false) {
+            echo "\n";
+            echo $class_name, " constructor expects the following parameters: (";
+            $var_names = $class_map[$class_name]->toKeysArray();
+            for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
+            return end_parse($var_types[count($var_names) - 1] . " " . $var_names[count($var_names) - 1] . ")");
+        }
+        if ($j + 1 < count($var_types) && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return;
+    }
+    if (!r_paren_semi($_GLOBALS, $lex, $i, $line)) return false;
+    $query = "INSERT INTO " . $class_name . " VALUES (default";
+    for ($j = 0; $j < count($var_types); $j++) {
+        $query .= ", " . (($var_values[$j] === null) ? "null" : $var_values[$j]);
+    }
+    if (!mysqli_query($_GLOBALS["CONN"], $query . ")"))
+        return parse_error("an unknown MySQL error occurred");
+    return mysqli_fetch_row(mysqli_query($_GLOBALS["CONN"], "SELECT LAST_INSERT_ID()"))[0];
+    // TODO:
+    // add to class name = new class(...)
+    // add to name = new class(...)
 }
 
 function assign_prim(dict $_GLOBALS, vec $lex, int $i, string $e, string $line, string $name) {
@@ -232,6 +251,8 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     case TokenType::BOOLEAN_LITERAL:
         if ($e == "boolean") return $token["value"];
         return expected_but_found($_GLOBALS, $token, $line, $e);
+    case TokenType::NULL_LITERAL:
+        return $_GLOBALS["PRIM"]->contains($e) ? expected_but_found($_GLOBALS, $token, $line, $e) : null;
     case TokenType::BOOLEAN_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["boolean"]));
     case TokenType::CHAR_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["char", "String"]));
     case TokenType::STRING_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["String"]));
@@ -322,10 +343,10 @@ function java_ref_to_mysql(string $type, string $name): string {
 }
 
 function parse_error(string $message) {
-    return end_parse("Error" . $message);
+    return end_parse("Error: " . $message);
 }
 
-function end_parse(string $print) {
+function end_parse($print) {
     echo $print, "\n";
     return false;
 }
