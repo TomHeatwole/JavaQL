@@ -57,7 +57,7 @@ $_GLOBALS["SYMBOL_TABLE"] = new Map();
 // Begin CLI 
 while (true) {
     $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
-    if ($line == "q" || $line == "quit") break;
+    if ($line == "quit") break;
     $lex = lex_command($_GLOBALS, $line);
     if (count($lex) > 0) parse_and_execute($_GLOBALS, $lex, $line, $conn);
 }
@@ -145,7 +145,8 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
             //TODO: check_end($lex, $i). Check for DOT match, etc
         }
         if (!must_end($lex, $i, $line)) return;
-        echo $_GLOBALS["SYMBOL_TABLE"][$lex[0]["value"]]["value"] . "\n";
+        $sym = $_GLOBALS["SYMBOL_TABLE"][$lex[0]["value"]];
+        echo get_display_val($_GLOBALS, $sym["type"], $sym["value"]), "\n";
         return;
     }
     return carrot_error_false("unexpected token: " . $lex[0]["value"], $line, 0);
@@ -217,7 +218,6 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
 function parse_id($_GLOBALS, $token, $line, $e, Set $accept) {
     if ($accept->contains($e)) return $_GLOBALS["SYMBOL_TABLE"][$token["value"]]["value"];
     echo $e, "\n";
-    var_dump($accept);
     return expected_but_found($_GLOBALS, $token, $line, $e);
 }
 
@@ -228,22 +228,23 @@ function print_query_result(dict $_GLOBALS, $result, string $class_name) {
     $var_types = $_GLOBALS["CLASS_MAP"][$class_name]->toValuesArray();
     while ($row = mysqli_fetch_row($result)) {
         $vars = dict[];
-        for ($i = 1; $i < count($row); $i++) {
-            $type = $var_types[$i - 1];
-            $display_val = $row[$i];
-            if ($type == "boolean") $display_val = (boolean)$display_val;
-            else if ($type == "double" || $type == "float") {
-                $display_val = str_replace("e", "E", $display_val);
-                $display_val = str_replace("+", "", $display_val);
-                if (!strpos($display_val, ".")) $display_val .= ".0";
-            }
-            else if (!$_GLOBALS["PRIM"]->contains($type))
-                $display_val = $type . "@" . $row[$i];
-            $vars[$var_names[$i - 1]] = $display_val;
-        }
+        for ($i = 1; $i < count($row); $i++)
+            $vars[$var_names[$i - 1]] = get_display_val($_GLOBALS, $var_types[$i - 1], $row[$i]);
         $print[] = $vars;
     }
     echo json_encode($print, JSON_PRETTY_PRINT), "\n";
+}
+
+function get_display_val(dict $_GLOBALS, string $type, $val) {
+    if ($type == "boolean") return (boolean)$val;
+    if ($type == "double" || $type == "float") {
+        $val = str_replace("e", "E", $val);
+        $val = str_replace("+", "", $val);
+        return strpos($val, ".") ? $val : $val .= ".0";
+    }
+    if (!$_GLOBALS["PRIM"]->contains($type))
+        return $val === null ? "null" : $type . "@" . $val;
+    return $val;
 }
 
 function r_paren_semi(dict $_GLOBALS, $lex, int $i, string $line): boolean {
