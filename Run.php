@@ -128,11 +128,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
         if ($lex[$i]["type"] != TokenType::ASSIGN)
             return carrot_error_false("expected end of command or = but found "
                 . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
-        $i++;
-        if (($val = parse_type($_GLOBALS, $conn,$lex, &$i, $line, $e)) === false) return;
-        if (!must_end($lex, $i, $line)) return;
-        $_GLOBALS["SYMBOL_TABLE"][$name] = shape("type" => $e, "value" => $val);
-        return;
+        return assign_prim($_GLOBALS, $conn, $lex, ++$i, $e, $line, $name);
     }
     if ($_GLOBALS["VAR_IDS"]->contains($lex[0]["type"])) {
         $sym = $_GLOBALS["SYMBOL_TABLE"][$lex[0]["value"]];
@@ -145,11 +141,18 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
                 return end_parse(get_display_val($_GLOBALS, $d["type"], $d["value"]));
             }
         }
-        // TODO: check for ASSIGN here
+        if ($lex[$i]["type"] == TokenType::ASSIGN)
+            return assign_prim($_GLOBALS, $conn, $lex, ++$i, $sym["type"], $line, $lex[0]["value"]);
         if (!must_end($lex, $i, $line)) return;
         return end_parse(get_display_val($_GLOBALS, $sym["type"], $sym["value"]));
     }
     return carrot_error_false("unexpected token: " . $lex[0]["value"], $line, 0);
+}
+
+function assign_prim(dict $_GLOBALS, $conn, vec $lex, int $i, string $e, string $line, string $name) {
+    if (($val = parse_type($_GLOBALS, $conn, $lex, &$i, $line, $e)) === false) return;
+    if (!must_end($lex, $i, $line)) return;
+    $_GLOBALS["SYMBOL_TABLE"][$name] = shape("type" => $e, "value" => $val);
 }
 
 function dereference(dict $_GLOBALS, $conn, string $type, $value, vec $lex, int &$i, string $line) {
@@ -182,8 +185,7 @@ function parse_type(dict $_GLOBALS, $conn, vec $lex, int &$i, string $line, stri
         if ($lex[$i]["type"] == TokenType::DOT) {
             $i++;
             if (!$d = dereference($_GLOBALS, $conn, $sym["type"], $sym["value"], $lex, &$i, $line)) return false;
-            // TODO
-            return;
+            return $d["value"];
         }
         if ($sym["type"] != $e) return expected_but_found($_GLOBALS, $token, $line, $e);
         return $sym["value"];
@@ -204,7 +206,7 @@ function parse_type(dict $_GLOBALS, $conn, vec $lex, int &$i, string $line, stri
                 return carrot_error_false("integer value too large", $line, $token["char_num"]);
             if ($int_val > $max || -$int_val > $max + 1)
                 return carrot_error_false("integer value " . $int_val .
-                " is too large for type " . $e, $line, $token["char_num"]); 
+                    " is too large for type " . $e, $line, $token["char_num"]); 
             return $token["value"];
         }
         return expected_but_found($_GLOBALS, $token, $line, $e);
