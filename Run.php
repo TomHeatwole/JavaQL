@@ -47,16 +47,14 @@ while ($row = mysqli_fetch_row($result)) {
     }
     $class_map[$row[0]] = new Map($vars);
 }
-echo "Classes loaded\n";
+echo "Classes loaded\n\n";
 
 $_GLOBALS["CLASS_MAP"] = new Map($class_map);
 $_GLOBALS["SYMBOL_TABLE"] = new Map();
-$_GLOBALS["SYMBOL_TABLE"]["ree"] = shape("type" => "oklolhaha99", "value" => 4);
-//$_GLOBALS["SYMBOL_TABLE"]["ree"] = shape("type" => "oklolhaha99", "value" => 1);
 
 // Begin CLI 
 while (true) {
-    $line = trim(readline("\n" . $_GLOBALS["PROJECT_NAME"] . "> "));
+    $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
     if ($line == "q" || $line == "quit") break;
     $lex = lex_command($_GLOBALS, $line);
     if (count($lex) > 0) parse_and_execute($_GLOBALS, $lex, $line, $conn);
@@ -71,26 +69,22 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
     case TokenType::M_GET_CLASSES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
-        echo json_encode($class_map, JSON_PRETTY_PRINT);
-        return;
+        return end_parse(json_encode($class_map, JSON_PRETTY_PRINT));
     case TokenType::M_GET_CLASS:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
-        echo json_encode($class_map[$class_name], JSON_PRETTY_PRINT);
-        return;
+        return end_parse(json_encode($class_map[$class_name], JSON_PRETTY_PRINT));
     case TokenType::M_GET_CLASS_NAMES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
-        echo json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT);
-        return;
+        return(json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT));
     case TokenType::M_GET_ALL_OBJECTS:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
         $result = mysqli_query($conn, "SELECT * FROM " . $class_name);
-        print_query_result($_GLOBALS, $result, $class_name);
-        return;
+        return end_parse(query_result_to_string($_GLOBALS, $result, $class_name));
     case TokenType::NEW_LITERAL:
         if (!($class_name = must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return;
         if (!must_match($_GLOBALS, $lex, ++$i, $line, TokenType::L_PAREN)) return;
@@ -104,8 +98,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
                 echo $class_name, " constructor expects the following parameters: (";
                 $var_names = $class_map[$class_name]->toKeysArray();
                 for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
-                echo $var_types[count($var_names) - 1], " ", $var_names[count($var_names) - 1], ")";
-                return;
+                return end_parse($var_types[count($var_names) - 1] . " " . $var_names[count($var_names) - 1] . ")");
             }
             if ($j + 1 < count($var_types) && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return;
         }
@@ -149,14 +142,12 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
                 if (!($d = dereference($_GLOBALS, $conn, $sym["type"], $sym["value"], $lex, &$i, $line))) return;
                 // TODO check for assign and end
                 if (!must_end($lex, $i, $line)) return;
-                echo get_display_val($_GLOBALS, $d["type"], $d["value"]);
-                return;
+                return end_parse(get_display_val($_GLOBALS, $d["type"], $d["value"]));
             }
         }
         // TODO: check for ASSIGN here
         if (!must_end($lex, $i, $line)) return;
-        echo get_display_val($_GLOBALS, $sym["type"], $sym["value"]);
-        return;
+        return end_parse(get_display_val($_GLOBALS, $sym["type"], $sym["value"]));
     }
     return carrot_error_false("unexpected token: " . $lex[0]["value"], $line, 0);
 }
@@ -172,10 +163,7 @@ function dereference(dict $_GLOBALS, $conn, string $type, $value, vec $lex, int 
         $is_primitive = $_GLOBALS["PRIM"]->contains($class_var_type);
         $row_name =  $is_primitive ? $lex[$i]["value"] : java_ref_to_mysql($class_var_type, $lex[$i]["value"]); 
         $result = mysqli_query($conn, "SELECT " . $row_name . " FROM " . $type . " WHERE _id=" . $value);
-        if (!$result) {
-            echo "Error: an unknown MySQL error occurred";
-            return false;
-        }
+        if (!$result) return parse_error("an unnown MySXQL error occurred");
         $parent = shape("type" => $type, "value" => $value);
         $value = mysqli_fetch_row($result)[0];
         $type = $class_var_type;
@@ -258,7 +246,7 @@ function parse_id($_GLOBALS, $token, $line, $e, Set $accept) {
     return expected_but_found($_GLOBALS, $token, $line, $e);
 }
 
-function print_query_result(dict $_GLOBALS, $result, string $class_name) {
+function query_result_to_string(dict $_GLOBALS, $result, string $class_name): string {
     $print = vec[];
     $var_names = $_GLOBALS["CLASS_MAP"][$class_name]->toKeysArray();
     $var_types = $_GLOBALS["CLASS_MAP"][$class_name]->toValuesArray();
@@ -268,7 +256,7 @@ function print_query_result(dict $_GLOBALS, $result, string $class_name) {
             $vars[$var_names[$i - 1]] = get_display_val($_GLOBALS, $var_types[$i - 1], $row[$i]);
         $print[] = $vars;
     }
-    echo json_encode($print, JSON_PRETTY_PRINT);
+    return json_encode($print, JSON_PRETTY_PRINT);
 }
 
 function get_display_val(dict $_GLOBALS, string $type, $val) {
@@ -327,6 +315,15 @@ function mysql_ref_to_java(string $name): shape("type" => string, "name" => stri
 
 function java_ref_to_mysql(string $type, string $name): string {
     return "_" . strlen($type) . $type . $name;
+}
+
+function parse_error(string $message) {
+    return end_parse("Error" . $message);
+}
+
+function end_parse(string $print) {
+    echo $print, "\n";
+    return false;
 }
 
 /*
