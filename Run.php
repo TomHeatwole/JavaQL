@@ -1,5 +1,4 @@
 <?hh  // strict
-
 include("Globals.php");
 include("Lex.php");
 
@@ -40,10 +39,9 @@ while ($row = mysqli_fetch_row($result)) {
         $name = $var['Field'];
         if ($name == "_id") continue;
         if ($name[0] == "_") {
-            $table_name_length = $name[1];
-            for ($i = 2; is_numeric($name[$i]); $i++) $table_name_length .= $name[$i];
-            $type = substr($name, 1 + strlen($table_name_length), $table_name_length);
-            $name = substr($name, 1 + strlen($table_name_length) + $table_name_length);
+            $j_type = mysql_ref_to_java($name);
+            $name = $j_type["name"];
+            $type = $j_type["type"];
         } else $type = $_GLOBALS["FROM_SQL_TYPE_MAP"][$var["Type"]];
         $vars[$name] = $type;
     }
@@ -53,18 +51,19 @@ echo "Classes loaded\n";
 
 $_GLOBALS["CLASS_MAP"] = new Map($class_map);
 $_GLOBALS["SYMBOL_TABLE"] = new Map();
+$_GLOBALS["SYMBOL_TABLE"]["ree"] = shape("type" => "oklolhaha99", "value" => 4);
+//$_GLOBALS["SYMBOL_TABLE"]["ree"] = shape("type" => "oklolhaha99", "value" => 1);
 
 // Begin CLI 
 while (true) {
     $line = trim(readline("\n" . $_GLOBALS["PROJECT_NAME"] . "> "));
-    if ($line == "quit") break;
+    if ($line == "q" || $line == "quit") break;
     $lex = lex_command($_GLOBALS, $line);
     if (count($lex) > 0) parse_and_execute($_GLOBALS, $lex, $line, $conn);
 }
 
 function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
     $class_map = $_GLOBALS["CLASS_MAP"];
-
     $i = 1;
     switch ($lex[0]["type"]) {
     case TokenType::EOL:
@@ -100,20 +99,21 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
         $i++;
         for ($j = 0; $j < count($var_types); $j++) {
             // === false to check for "0"
-            echo "\n";
-            if (($var_values[] = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j])) === false) {
-                echo $var_values[$j];
+            if (($var_values[] = parse_type($_GLOBALS, $conn, $lex, &$i, $line, $var_types[$j])) === false) {
+                echo "\n";
                 echo $class_name, " constructor expects the following parameters: (";
                 $var_names = $class_map[$class_name]->toKeysArray();
                 for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
-                echo $var_types[count($var_names) - 1], " ", $var_names[count($var_names) - 1];
+                echo $var_types[count($var_names) - 1], " ", $var_names[count($var_names) - 1], ")";
                 return;
             }
             if ($j + 1 < count($var_types) && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return;
         }
         if (!r_paren_semi($_GLOBALS, $lex, $i, $line)) return;
         $query = "INSERT INTO " . $class_name . " VALUES (default";
-        for ($j = 0; $j < count($var_types); $j++) $query .= ", " . $var_values[$j];
+        for ($j = 0; $j < count($var_types); $j++) {
+            $query .= ", " . (($var_values[$j] ==- null) ? "null" : $var_values[$j]);
+        }
         if (!mysqli_query($conn, $query . ")")) echo "Error: an unknown MySQL error occurred";
         return;
     }
@@ -126,9 +126,9 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
         else if ($_GLOBALS["VAR_IDS"]->contains($lex[$i]["type"]))
             return carrot_error_false("variable " . $lex[$i]["value"] .
                 " is already defined", $line, $lex[$i]["char_num"]);
-        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::ID)) return;
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::ID)) return; // TODO: bad error message
         $name = $lex[$i]["value"];
-        if (check_end($lex, ++$i)) {
+        if (check_end($lex, ++$i)) { // TODO: I don't love this error message
             $_GLOBALS["SYMBOL_TABLE"][$name] = shape("type" => $e, "value" => $_GLOBALS["DEFAULTS"][$j_type]);
             return;
         }
@@ -136,32 +136,69 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line, $conn) {
             return carrot_error_false("expected end of command or = but found "
                 . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
         $i++;
-        if (($val = parse_type($_GLOBALS, $lex, &$i, $line, $e)) == false) return;
+        if (($val = parse_type($_GLOBALS, $conn,$lex, &$i, $line, $e)) === false) return;
         if (!must_end($lex, $i, $line)) return;
         $_GLOBALS["SYMBOL_TABLE"][$name] = shape("type" => $e, "value" => $val);
         return;
     }
     if ($_GLOBALS["VAR_IDS"]->contains($lex[0]["type"])) {
-        if ($lex[0]["type"] == TokenType::OBJ_ID) {
-            //TODO: check_end($lex, $i). Check for DOT match, etc
-        }
-        if (!must_end($lex, $i, $line)) return;
         $sym = $_GLOBALS["SYMBOL_TABLE"][$lex[0]["value"]];
+        if ($lex[0]["type"] == TokenType::OBJ_ID) {
+            if ($lex[$i]["type"] == TokenType::DOT) {
+                $i++;
+                if (!($d = dereference($_GLOBALS, $conn, $sym["type"], $sym["value"], $lex, &$i, $line))) return;
+                // TODO check for assign and end
+                if (!must_end($lex, $i, $line)) return;
+                echo get_display_val($_GLOBALS, $d["type"], $d["value"]);
+                return;
+            }
+        }
+        // TODO: check for ASSIGN here
+        if (!must_end($lex, $i, $line)) return;
         echo get_display_val($_GLOBALS, $sym["type"], $sym["value"]);
         return;
     }
     return carrot_error_false("unexpected token: " . $lex[0]["value"], $line, 0);
 }
 
+function dereference(dict $_GLOBALS, $conn, string $type, $value, vec $lex, int &$i, string $line) {
+    for (;;$i++) {
+        if (!$_GLOBALS["ALL_IDS"]->contains($lex[$i]["type"]))
+            return carrot_error_false("unexpected token: " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
+        if ($value === null) return carrot_error_false("null pointer exception", $line, $lex[$i - 1]["char_num"]);
+        if (!$_GLOBALS["CLASS_MAP"][$type]->contains($lex[$i]["value"]))
+            return carrot_and_error($lex[$i]["value"] . " does not exist in class " . $type, $line, $lex[$i]["char_num"]);
+        $class_var_type = $_GLOBALS["CLASS_MAP"][$type][$lex[$i]["value"]];
+        $is_primitive = $_GLOBALS["PRIM"]->contains($class_var_type);
+        $row_name =  $is_primitive ? $lex[$i]["value"] : java_ref_to_mysql($class_var_type, $lex[$i]["value"]); 
+        $result = mysqli_query($conn, "SELECT " . $row_name . " FROM " . $type . " WHERE _id=" . $value);
+        if (!$result) {
+            echo "Error: an unknown MySQL error occurred";
+            return false;
+        }
+        $parent = shape("type" => $type, "value" => $value);
+        $value = mysqli_fetch_row($result)[0];
+        $type = $class_var_type;
+        if ($lex[++$i]["type"] != TokenType::DOT || $is_primitive) break;
+    }
+    return shape("parent" => $parent, "value" => $value, "type" => $type);
+}
+
 // return value if parsed correctly or false otherwise
-function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) {
+function parse_type(dict $_GLOBALS, $conn, vec $lex, int &$i, string $line, string $e) {
     // TODO: Implement default
     $token = $lex[$i++];
     switch($token["type"]) {
     case TokenType::OBJ_ID:
-        // TODO: OBJ_ID.ID.ID...ID
-        echo "NOT IMPLEMENTED";
-        return false;
+        $sym = $_GLOBALS["SYMBOL_TABLE"][$token["value"]];
+        if ($lex[$i]["type"] == TokenType::DOT) {
+            $i++;
+            if (!$d = dereference($_GLOBALS, $conn, $sym["type"], $sym["value"], $lex, &$i, $line)) return false;
+            // TODO
+            return;
+        }
+        if ($sym["type"] != $e) return expected_but_found($_GLOBALS, $token, $line, $e);
+        return $sym["value"];
     case TokenType::INT_LITERAL:
         $int_val = (int)$token["value"];
         if ($e == "float") {
@@ -218,12 +255,10 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
 
 function parse_id($_GLOBALS, $token, $line, $e, Set $accept) {
     if ($accept->contains($e)) return $_GLOBALS["SYMBOL_TABLE"][$token["value"]]["value"];
-    echo $e;
     return expected_but_found($_GLOBALS, $token, $line, $e);
 }
 
 function print_query_result(dict $_GLOBALS, $result, string $class_name) {
-    // TODO: null as display_val, NULL -> null
     $print = vec[];
     $var_names = $_GLOBALS["CLASS_MAP"][$class_name]->toKeysArray();
     $var_types = $_GLOBALS["CLASS_MAP"][$class_name]->toValuesArray();
@@ -237,7 +272,7 @@ function print_query_result(dict $_GLOBALS, $result, string $class_name) {
 }
 
 function get_display_val(dict $_GLOBALS, string $type, $val) {
-    if ($type == "boolean") return (boolean)$val;
+    if ($type == "boolean") return $val && $val !== "false" ? "true" : "false";
     if ($type == "double" || $type == "float") {
         $val = str_replace("e", "E", $val);
         $val = str_replace("+", "", $val);
@@ -259,9 +294,6 @@ function must_match(dict $_GLOBALS, vec $lex, int $i, string $line, TokenType $e
     return $lex[$i]["value"];
 }
 
-// Same thing as above with "unexpected token" error message instead of expected but found"
-function must_match_unexpected() {} // TODO
-
 function expected_but_found(dict $_GLOBALS, $token, string $line, string $e): boolean {
     return carrot_error_false("expected " . $e . " but found " .
         $_GLOBALS["TOKEN_NAME_MAP"][$token["type"]], $line, $token["char_num"]);
@@ -282,6 +314,19 @@ function check_end(vec $lex, int $i): boolean {
 function carrot_error_false(string $message, string $line, int $char_num) {
     carrot_and_error($message, $line, $char_num);
     return false;
+}
+
+function mysql_ref_to_java(string $name): shape("type" => string, "name" => string) {
+    $table_name_length = $name[1];
+    for ($i = 2; is_numeric($name[$i]); $i++) $table_name_length .= $name[$i];
+    return shape(
+        "type" => substr($name, 1 + strlen($table_name_length), $table_name_length),
+        "name" => substr($name, 1 + strlen($table_name_length) + $table_name_length)
+    );
+}
+
+function java_ref_to_mysql(string $type, string $name): string {
+    return "_" . strlen($type) . $type . $name;
 }
 
 /*

@@ -154,6 +154,20 @@ $_GLOBALS = dict[
         TokenType::CHAR_ID,
         TokenType::OBJ_ID,
     ]),
+    "ALL_IDS" => new Set(vec[
+        TokenType::FLOAT_ID,
+        TokenType::DOUBLE_ID,
+        TokenType::BOOLEAN_ID,
+        TokenType::STRING_ID,
+        TokenType::BYTE_ID,
+        TokenType::SHORT_ID,
+        TokenType::INT_ID,
+        TokenType::LONG_ID,
+        TokenType::CHAR_ID,
+        TokenType::OBJ_ID,
+        TokenType::CLASS_ID,
+        TokenType::ID,
+    ]),
     "JAVA_TYPE_TO_ID" => new Map(dict[
         "float" => TokenType::FLOAT_ID,
         "double" => TokenType::DOUBLE_ID,
@@ -205,7 +219,7 @@ $_GLOBALS = dict[
         "." => TokenType::DOT,
         "," => TokenType::COMMA,
     ]),
-    "PRIM" => new Set(vec["short", "byte", "int", "long", "float", "double", "char", "String"]), // JavaQL primitives
+    "PRIM" => new Set(vec["short", "byte", "int", "long", "float", "double", "char", "boolean", "String"]), // JavaQL primitives
     "INT_MAX" => new Map(dict[
         "byte" => 127,
         "short" => 32767,

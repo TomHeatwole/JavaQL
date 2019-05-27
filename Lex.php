@@ -106,7 +106,7 @@ function lex_command(
 
         // Underscore error
         } else if ($line[$i] == "_") {
-            return carrot_and_error("JavaQL identifiers may not begin with an unerscore", $line, $i);
+            return carrot_and_error("JavaQL identifiers may not begin with an underscore", $line, $i);
 
         // Symbols 
         } else {
