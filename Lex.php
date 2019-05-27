@@ -7,7 +7,7 @@ function carrot_pointer(string $line, int $index) {
 }
 
 function lex_error(string $message): vec {
-    echo "Error: ", $message, "\n";
+    echo "Error: ", $message;
     return vec[];
 }
 
