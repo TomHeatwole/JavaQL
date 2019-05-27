@@ -235,6 +235,7 @@ function print_query_result(dict $_GLOBALS, $result, string $class_name) {
             else if ($type == "double" || $type == "float") {
                 $display_val = str_replace("e", "E", $display_val);
                 $display_val = str_replace("+", "", $display_val);
+                if (!strpos($display_val, ".")) $display_val .= ".0";
             }
             else if (!$_GLOBALS["PRIM"]->contains($type))
                 $display_val = $type . "@" . $row[$i];
@@ -255,6 +256,9 @@ function must_match(dict $_GLOBALS, vec $lex, int $i, string $line, TokenType $e
         return expected_but_found($_GLOBALS, $lex[$i], $line, $_GLOBALS["TOKEN_NAME_MAP"][$e]);
     return $lex[$i]["value"];
 }
+
+// Same thing as above with "unexpected token" error message instead of expected but found"
+function must_match_unexpected() {} // TODO
 
 function expected_but_found(dict $_GLOBALS, $token, string $line, string $e): boolean {
     return carrot_error_false("expected " . $e . " but found " .
