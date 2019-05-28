@@ -57,7 +57,7 @@ $_GLOBALS["SYMBOL_TABLE"] = new Map();
 while (true) {
     $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
     if ($line == "q" || $line == "quit") break;
-    $lex = lex_command($_GLOBALS, $line);
+    if (!$lex = lex_command($_GLOBALS, $line)) continue;
     if (count($lex) > 0) parse_and_execute($_GLOBALS, $lex, $line);
 }
 
@@ -93,10 +93,10 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         $j_type = $_GLOBALS["JAVA_TYPES"][$lex[0]["type"]];
         $e = ($j_type == "class") ? $lex[0]["value"] : $j_type;
         if ($lex[$i]["type"] == TokenType::CLASS_ID)
-            return carrot_error_false($_GLOBALS["PROJECT_NAME"] .
+            return carrot_and_error($_GLOBALS["PROJECT_NAME"] .
                 " variables may not share names with classes", $line, $lex[$i]["char_num"]);
         else if ($_GLOBALS["VAR_IDS"]->contains($lex[$i]["type"]))
-            return carrot_error_false("variable " . $lex[$i]["value"] .
+            return carrot_and_error("variable " . $lex[$i]["value"] .
                 " is already defined", $line, $lex[$i]["char_num"]);
         if (!must_match_unexpected($lex, $i, $line, TokenType::ID)) return;
         $name = $lex[$i]["value"];
@@ -132,7 +132,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             else if (($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"])) === false) return;
             else if (!must_end($lex, $i, $line)) return;
             if (!mysqli_query($_GLOBALS["CONN"], "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=" .
-                $set_val . " WHERE _id=" . $d["parent"]["value"])) return parse_error("an unknown MySQL error occurred");
+                $set_val . " WHERE _id=" . $d["parent"]["value"])) return error("an unknown MySQL error occurred");
             return;
         }
         if ($lex[$i]["type"] == TokenType::ASSIGN)
@@ -148,7 +148,7 @@ function new_object(dict $_GLOBALS, vec $lex, int $i, string $line, string $e) {
     $class_map = $_GLOBALS["CLASS_MAP"];
     if (!($class_name = must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return false;
     if ($e != "" && $e != $class_name)
-        return carrot_error_false("expected " . $e . " but found " . $class_name, $line, $lex[$i]["char_num"]);
+        return carrot_and_error("expected " . $e . " but found " . $class_name, $line, $lex[$i]["char_num"]);
     if (!must_match($_GLOBALS, $lex, ++$i, $line, TokenType::L_PAREN)) return false;
     $var_types = $class_map[$class_name]->toValuesArray();
     $var_values = vec[];
@@ -169,7 +169,7 @@ function new_object(dict $_GLOBALS, vec $lex, int $i, string $line, string $e) {
         $query .= ", " . (($var_values[$j] === null) ? "null" : $var_values[$j]);
     }
     if (!mysqli_query($_GLOBALS["CONN"], $query . ")"))
-        return parse_error("an unknown MySQL error occurred");
+        return error("an unknown MySQL error occurred");
     return mysqli_fetch_row(mysqli_query($_GLOBALS["CONN"], "SELECT LAST_INSERT_ID()"))[0];
 }
 
@@ -183,14 +183,14 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
     for (;; $i++) {
         if (!$_GLOBALS["ALL_IDS"]->contains($lex[$i]["type"]))
             return unexpected_token($lex[$i], $line);
-        if ($value === null) return carrot_error_false("null pointer exception", $line, $lex[$i - 1]["char_num"]);
+        if ($value === null) return carrot_and_error("null pointer exception", $line, $lex[$i - 1]["char_num"]);
         if (!$_GLOBALS["CLASS_MAP"][$type]->contains($lex[$i]["value"]))
             return carrot_and_error($lex[$i]["value"] . " does not exist in class " . $type, $line, $lex[$i]["char_num"]);
         $class_var_type = $_GLOBALS["CLASS_MAP"][$type][$lex[$i]["value"]];
         $is_primitive = $_GLOBALS["PRIM"]->contains($class_var_type);
         $row_name =  $is_primitive ? $lex[$i]["value"] : java_ref_to_mysql($class_var_type, $lex[$i]["value"]); 
         $result = mysqli_query($_GLOBALS["CONN"], "SELECT " . $row_name . " FROM " . $type . " WHERE _id=" . $value);
-        if (!$result) return parse_error("an unnown MySXQL error occurred");
+        if (!$result) return error("an unnown MySXQL error occurred");
         $parent = shape("type" => $type, "value" => $value);
         $value = mysqli_fetch_row($result)[0];
         $type = $class_var_type;
@@ -217,19 +217,19 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         $int_val = (int)$token["value"];
         if ($e == "float") {
             if ($int_val <= $_GLOBALS["FLOAT_MAX"]) return $token["value"];
-            return carrot_error_false("int literal is too large for type float", $line, $token["char_num"]);
+            return carrot_and_error("int literal is too large for type float", $line, $token["char_num"]);
         }
         if ($e == "double") {
             if ((double)$token["value"] != INF) return $token["value"];
-            return carrot_error_false("int literal is too large for type double", $line, $token["char_num"]);
+            return carrot_and_error("int literal is too large for type double", $line, $token["char_num"]);
         }
         if ($_GLOBALS["INT_MAX"]->containsKey($e)) {
             $max = $_GLOBALS["INT_MAX"][$e];
             // TODO: Figure out how to check for longs on a 32 bit machine
             if ("" . $int_val != $token["value"])
-                return carrot_error_false("integer value too large", $line, $token["char_num"]);
+                return carrot_and_error("integer value too large", $line, $token["char_num"]);
             if ($int_val > $max || -$int_val > $max + 1)
-                return carrot_error_false("integer value " . $int_val .
+                return carrot_and_error("integer value " . $int_val .
                     " is too large for type " . $e, $line, $token["char_num"]); 
             return $token["value"];
         }
@@ -237,10 +237,10 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     case TokenType::FLOAT_LITERAL:
         $float_val = (double)$token["value"];
         if ($float_val == INF)
-            return carrot_error_false("decimal literal is too large", $line, $token["char_num"]);
+            return carrot_and_error("decimal literal is too large", $line, $token["char_num"]);
         if ($e == "float") {
             if ($float_val > $_GLOBALS["FLOAT_MAX"])
-                return carrot_error_false("decimal literal is too large for type float", $line, $token["char_num"]);
+                return carrot_and_error("decimal literal is too large for type float", $line, $token["char_num"]);
             return $token["value"];
         }
         if ($e == "double") return $token["value"];
@@ -321,11 +321,11 @@ function must_match_unexpected(vec $lex, int $i, string $line, TokenType $e) {
 }
 
 function unexpected_token($token, string $line): boolean {
-    return carrot_error_false("unexpected token: " . $token["value"], $line, $token["char_num"]);
+    return carrot_and_error("unexpected token: " . $token["value"], $line, $token["char_num"]);
 }
 
 function expected_but_found(dict $_GLOBALS, $token, string $line, string $e): boolean {
-    return carrot_error_false("expected " . $e . " but found " .
+    return carrot_and_error("expected " . $e . " but found " .
         $_GLOBALS["TOKEN_NAME_MAP"][$token["type"]], $line, $token["char_num"]);
 }
 
@@ -346,11 +346,6 @@ function check_end(vec $lex, int $i, string $line): int {
     return 0;
 }
 
-function carrot_error_false(string $message, string $line, int $char_num) {
-    carrot_and_error($message, $line, $char_num);
-    return false;
-}
-
 function mysql_ref_to_java(string $name): shape("type" => string, "name" => string) {
     $table_name_length = $name[1];
     for ($i = 2; is_numeric($name[$i]); $i++) $table_name_length .= $name[$i];
@@ -364,7 +359,7 @@ function java_ref_to_mysql(string $type, string $name): string {
     return "_" . strlen($type) . $type . $name;
 }
 
-function parse_error(string $message) {
+function error(string $message) {
     return end_parse("Error: " . $message);
 }
 

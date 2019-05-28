@@ -6,9 +6,9 @@ function carrot_pointer(string $line, int $index) {
     echo $line, "\n", str_repeat(" ", $index), "^\n";
 }
 
-function lex_error(string $message): vec {
+function error(string $message): vec {
     echo "Error: ", $message, "\n";
-    return vec[];
+    return false;
 }
 
 function carrot_and_error(string $message, string $line, int $index): vec {
@@ -16,12 +16,7 @@ function carrot_and_error(string $message, string $line, int $index): vec {
     return lex_error($message);
 }
 
-// For CLI commands
-// No need to worry about comments here
-function lex_command(
-    dict $_GLOBALS,
-    string $line,
-): vec<shape("type" => TokenType, "value" => string, "char_num" => int)> {
+function lex_command(dict $_GLOBALS, string $line) {
     $ret = vec[];
     // For loop starts on beginning of new token attempt
     for ($i = 0; $i < strlen($line); $i++) {
@@ -47,8 +42,7 @@ function lex_command(
 
         // int or float literal
         } else if (is_numeric($line[$i])) {
-            $result = lex_number($line, &$i, false);
-            if ($i == -1) return vec[];
+            if (!$result = lex_number($line, &$i, false)) return false;
             $ret[] = $result;
 
         // String literal
@@ -91,8 +85,7 @@ function lex_command(
             if ($i + 1 == strlen($line) || !(is_numeric($line[$i + 1]))) {
                 $ret[] = shape("type" => TokenType::DOT, "value" => ".", "char_num" => $i);
             } else {
-                $result = lex_number($line, &$i, true);
-                if ($i == -1) return vec[];
+                if (!$result = lex_number($line, &$i, true)) return false;
                 $ret[] = $result;
             }
 
@@ -100,8 +93,7 @@ function lex_command(
         } else if ($line[$i] == "-") {
             if ($i + 1 == strlen($line) || !is_numeric($line[$i + 1]))
                 return carrot_and_error("unrecognized symbol: -", $line, $i);
-            $result = lex_number($line, &$i, false);
-            if ($i == -1) return vec[];
+            if (!$result = lex_number($line, &$i, false)) return false;
             $ret[] = $result;
 
         // Underscore error
@@ -124,7 +116,7 @@ function lex_command(
     return $ret;
 }
 
-function lex_number(string $line, int &$i, bool $decimal): shape("type" => TokenType, "value" => string) {
+function lex_number(string $line, int &$i, bool $decimal) {
     $start = $i;
     $e = false;
     $invalid = false;
@@ -140,11 +132,7 @@ function lex_number(string $line, int &$i, bool $decimal): shape("type" => Token
             }
             $e = true;
         } else if (!is_numeric($line[$i + 1])) break;
-        if ($invalid) {
-            carrot_and_error("malformed number", $line, $start);
-            $i = -1;
-            return shape();
-        }
+        if ($invalid) return carrot_and_error("malformed_number", $line, $start);
     }
     return shape(
         "type" => $decimal ? TokenType::FLOAT_LITERAL : TokenType::INT_LITERAL, 
