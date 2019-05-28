@@ -36,8 +36,8 @@ while ($row = mysqli_fetch_row($result)) {
     $vars = dict[];
     while ($var = mysqli_fetch_assoc($class)) {
         $name = $var['Field'];
-        if ($name == "_id") continue;
-        if ($name[0] == "_") {
+        if ($name === "_id") continue;
+        if ($name[0] === "_") {
             $j_type = mysql_ref_to_java($name);
             $name = $j_type["name"];
             $type = $j_type["type"];
@@ -55,7 +55,7 @@ $_GLOBALS["SYMBOL_TABLE"] = new Map();
 // Begin CLI 
 while (true) {
     $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
-    if ($line == "q" || $line == "quit") break;
+    if ($line === "q" || $line === "quit") break;
     if (!$lex = lex_command($_GLOBALS, $line)) continue;
     if (count($lex) > 0) parse_and_execute($_GLOBALS, $lex, $line);
 }
@@ -87,7 +87,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         return end_parse(query_result_to_string($_GLOBALS, $result, $class_name));
     case TokenType::M_BUILD:
         if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return;
-        if ($lex[$i]["type"] == TokenType::ID) {
+        if ($lex[$i]["type"] === TokenType::ID) {
             if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
             // TODO: code for initial build
             return;
@@ -106,8 +106,8 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
     }
     if ($_GLOBALS["JAVA_TYPES"]->containsKey($lex[0]["type"])) {
         $j_type = $_GLOBALS["JAVA_TYPES"][$lex[0]["type"]];
-        $e = ($j_type == "class") ? $lex[0]["value"] : $j_type;
-        if ($lex[$i]["type"] == TokenType::CLASS_ID)
+        $e = ($j_type === "class") ? $lex[0]["value"] : $j_type;
+        if ($lex[$i]["type"] === TokenType::CLASS_ID)
             return carrot_and_error($_GLOBALS["PROJECT_NAME"] .
                 " variables may not share names with classes", $line, $lex[$i]["char_num"]);
         else if ($_GLOBALS["VAR_IDS"]->contains($lex[$i]["type"]))
@@ -116,13 +116,13 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!must_match_unexpected($lex, $i, $line, TokenType::ID)) return;
         $name = $lex[$i]["value"];
         if ($end = check_end($lex, ++$i, $line)) {
-            if ($end == -1) return;
+            if ($end === -1) return;
             $_GLOBALS["SYMBOL_TABLE"][$name] = shape("type" => $e, "value" => $_GLOBALS["DEFAULTS"][$j_type]);
             return;
         }
         if (!must_match_unexpected($lex, $i, $line, TokenType::ASSIGN)) return;
-        if ($j_type == "class") {
-            if ($lex[++$i]["type"] == TokenType::NEW_LITERAL) {
+        if ($j_type === "class") {
+            if ($lex[++$i]["type"] === TokenType::NEW_LITERAL) {
                 if (!$new_val = new_object($_GLOBALS, $lex, ++$i, $line, $e)) return false;
                 $_GLOBALS["SYMBOL_TABLE"][$name] = shape("value" => $new_val, "type" => $e);
                 return;
@@ -133,15 +133,15 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
     }
     if ($_GLOBALS["VAR_IDS"]->contains($lex[0]["type"])) {
         $sym = $_GLOBALS["SYMBOL_TABLE"][$lex[0]["value"]];
-        if ($lex[0]["type"] == TokenType::OBJ_ID && $lex[$i]["type"] == TokenType::DOT) {
+        if ($lex[0]["type"] === TokenType::OBJ_ID && $lex[$i]["type"] === TokenType::DOT) {
             $i++;
             if (!($d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line))) return;
             if ($end = check_end($lex, $i, $line)) {
-                if ($end == -1) return;
+                if ($end === -1) return;
                 return end_parse(get_display_val($_GLOBALS, $d["type"], $d["value"]));
             }
             if (!must_match_unexpected($lex, $i, $line, TokenType::ASSIGN)) return;
-            if ($lex[++$i]["type"] == TokenType::NEW_LITERAL) {
+            if ($lex[++$i]["type"] === TokenType::NEW_LITERAL) {
                 if (!($set_val = new_object($_GLOBALS, $lex, ++$i, $line, $d["type"]))) return;
             }
             else if (($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"])) === false) return;
@@ -150,7 +150,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 $set_val . " WHERE _id=" . $d["parent"]["value"])) return error("an unknown MySQL error occurred");
             return;
         }
-        if ($lex[$i]["type"] == TokenType::ASSIGN)
+        if ($lex[$i]["type"] === TokenType::ASSIGN)
             return assign($_GLOBALS, $lex, ++$i, $sym["type"], $line, $lex[0]["value"]);
         if (!must_end($lex, $i, $line)) return;
         return end_parse(get_display_val($_GLOBALS, $sym["type"], $sym["value"]));
@@ -221,7 +221,7 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     switch($token["type"]) {
     case TokenType::OBJ_ID:
         $sym = $_GLOBALS["SYMBOL_TABLE"][$token["value"]];
-        if ($lex[$i]["type"] == TokenType::DOT) {
+        if ($lex[$i]["type"] === TokenType::DOT) {
             $i++;
             if (!$d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line)) return false;
             return $d["value"];
@@ -230,11 +230,11 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         return $sym["value"];
     case TokenType::INT_LITERAL:
         $int_val = (int)$token["value"];
-        if ($e == "float") {
+        if ($e === "float") {
             if ($int_val <= $_GLOBALS["FLOAT_MAX"]) return $token["value"];
             return carrot_and_error("int literal is too large for type float", $line, $token["char_num"]);
         }
-        if ($e == "double") {
+        if ($e === "double") {
             if ((double)$token["value"] != INF) return $token["value"];
             return carrot_and_error("int literal is too large for type double", $line, $token["char_num"]);
         }
@@ -251,23 +251,23 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::FLOAT_LITERAL:
         $float_val = (double)$token["value"];
-        if ($float_val == INF)
+        if ($float_val === INF)
             return carrot_and_error("decimal literal is too large", $line, $token["char_num"]);
-        if ($e == "float") {
+        if ($e === "float") {
             if ($float_val > $_GLOBALS["FLOAT_MAX"])
                 return carrot_and_error("decimal literal is too large for type float", $line, $token["char_num"]);
             return $token["value"];
         }
-        if ($e == "double") return $token["value"];
+        if ($e === "double") return $token["value"];
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::CHAR_LITERAL:
-        if ($e == "char") return $token["value"];
+        if ($e === "char") return $token["value"];
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::STRING_LITERAL:
-        if ($e == "String") return $token["value"];
+        if ($e === "String") return $token["value"];
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::BOOLEAN_LITERAL:
-        if ($e == "boolean") return $token["value"];
+        if ($e === "boolean") return $token["value"];
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::NULL_LITERAL:
         return $_GLOBALS["PRIM"]->contains($e) ? expected_but_found($_GLOBALS, $token, $line, $e) : null;
@@ -307,8 +307,8 @@ function query_result_to_string(dict $_GLOBALS, $result, string $class_name): st
 }
 
 function get_display_val(dict $_GLOBALS, string $type, $val) {
-    if ($type == "boolean") return $val && $val !== "false" ? "true" : "false";
-    if ($type == "double" || $type == "float") {
+    if ($type === "boolean") return $val && $val !== "false" ? "true" : "false";
+    if ($type === "double" || $type === "float") {
         $val = str_replace("e", "E", $val);
         $val = str_replace("+", "", $val);
         return strpos($val, ".") ? $val : $val .= ".0";
@@ -345,16 +345,16 @@ function expected_but_found(dict $_GLOBALS, $token, string $line, string $e): bo
 }
 
 function must_end(vec $lex, int $i, string $line): boolean {
-    if ($lex[$i]["type"] == TokenType::EOL) return true;
-    else if ($lex[$i]["type"] == TokenType::SEMI && $lex[++$i]["type"] == TokenType::EOL) return true;
+    if ($lex[$i]["type"] === TokenType::EOL) return true;
+    else if ($lex[$i]["type"] === TokenType::SEMI && $lex[++$i]["type"] == TokenType::EOL) return true;
     return unexpected_token($lex[$i], $line);
 }
 
 // -1 = error, 0 = not ending, 1 = ending
 function check_end(vec $lex, int $i, string $line): int {
-    if ($lex[$i]["type"] == TokenType::EOL) return 1;
-    if ($lex[$i]["type"] == TokenType::SEMI) {
-        if ($lex[++$i]["type"] == TokenType::EOL) return  1;
+    if ($lex[$i]["type"] === TokenType::EOL) return 1;
+    if ($lex[$i]["type"] === TokenType::SEMI) {
+        if ($lex[++$i]["type"] === TokenType::EOL) return  1;
         unexpected_token($lex[$i], $line);
         return -1;
     } 
