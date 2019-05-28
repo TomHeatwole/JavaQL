@@ -98,15 +98,14 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         else if ($_GLOBALS["VAR_IDS"]->contains($lex[$i]["type"]))
             return carrot_error_false("variable " . $lex[$i]["value"] .
                 " is already defined", $line, $lex[$i]["char_num"]);
-        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::ID)) return; // TODO: bad error message
+        if (!must_match_unexpected($lex, $i, $line, TokenType::ID)) return;
         $name = $lex[$i]["value"];
-        if (check_end($lex, ++$i)) { // TODO: I don't love this error message
+        if ($end = check_end($lex, ++$i, $line)) {
+            if ($end == -1) return;
             $_GLOBALS["SYMBOL_TABLE"][$name] = shape("type" => $e, "value" => $_GLOBALS["DEFAULTS"][$j_type]);
             return;
         }
-        if ($lex[$i]["type"] != TokenType::ASSIGN)
-            return carrot_error_false("expected end of command or = but found "
-                . $lex[$i]["value"], $line, $lex[$i]["char_num"]); // TODO: bad error message
+        if (!must_match_unexpected($lex, $i, $line, TokenType::ASSIGN)) return;
         if ($j_type == "class") {
             if ($lex[++$i]["type"] == TokenType::NEW_LITERAL) {
                 if (!$new_val = new_object($_GLOBALS, $lex, ++$i, $line, $e)) return false;
@@ -122,7 +121,10 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if ($lex[0]["type"] == TokenType::OBJ_ID && $lex[$i]["type"] == TokenType::DOT) {
             $i++;
             if (!($d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line))) return;
-            if (check_end($lex, $i, $line)) return end_parse(get_display_val($_GLOBALS, $d["type"], $d["value"]));
+            if ($end = check_end($lex, $i, $line)) {
+                if ($end == -1) return;
+                return end_parse(get_display_val($_GLOBALS, $d["type"], $d["value"]));
+            }
             if ($lex[$i]["type"] != TokenType::ASSIGN) return parse_error("TODO error");
             if ($lex[++$i]["type"] == TokenType::NEW_LITERAL) {
                 if (!($set_val = new_object($_GLOBALS, $lex, ++$i, $line, $d["type"]))) return;
@@ -154,7 +156,6 @@ function new_object(dict $_GLOBALS, vec $lex, int $i, string $line, string $e) {
     for ($j = 0; $j < count($var_types); $j++) {
         // === false to check for "0"
         if (($var_values[] = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j])) === false) {
-            echo "\n";
             echo $class_name, " constructor expects the following parameters: (";
             $var_names = $class_map[$class_name]->toKeysArray();
             for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
@@ -313,6 +314,16 @@ function must_match(dict $_GLOBALS, vec $lex, int $i, string $line, TokenType $e
     return $lex[$i]["value"];
 }
 
+function must_match_unexpected(vec $lex, int $i, string $line, TokenType $e) {
+    if ($lex[$i]["type"] != $e)
+        return unexpected_token($lex[$i], $line);
+    return $lex[$i]["value"];
+}
+
+function unexpected_token($token, string $line): boolean {
+    return carrot_error_false("unexpected token " . $token["value"], $line, $token["char_num"]);
+}
+
 function expected_but_found(dict $_GLOBALS, $token, string $line, string $e): boolean {
     return carrot_error_false("expected " . $e . " but found " .
         $_GLOBALS["TOKEN_NAME_MAP"][$token["type"]], $line, $token["char_num"]);
@@ -324,10 +335,15 @@ function must_end(vec $lex, int $i, string $line): boolean {
     return carrot_error_false("unexpected token: " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
 }
 
-function check_end(vec $lex, int $i): boolean {
-    if ($lex[$i]["type"] == TokenType::EOL) return true;
-    else if ($lex[$i]["type"] == TokenType::SEMI && $lex[++$i]["type"] == TokenType::EOL) return true;
-    return false;
+// -1 = error, 0 = not ending, 1 = ending
+function check_end(vec $lex, int $i, string $line): int {
+    if ($lex[$i]["type"] == TokenType::EOL) return 1;
+    if ($lex[$i]["type"] == TokenType::SEMI) {
+        if ($lex[++$i]["type"] == TokenType::EOL) return  1;
+        unexpected_token($lex[$i], $line);
+        return -1;
+    } 
+    return 0;
 }
 
 function carrot_error_false(string $message, string $line, int $char_num) {
