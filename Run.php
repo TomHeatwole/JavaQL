@@ -125,7 +125,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 if ($end == -1) return;
                 return end_parse(get_display_val($_GLOBALS, $d["type"], $d["value"]));
             }
-            if ($lex[$i]["type"] != TokenType::ASSIGN) return parse_error("TODO error");
+            if (!must_match_unexpected($lex, $i, $line, TokenType::ASSIGN)) return;
             if ($lex[++$i]["type"] == TokenType::NEW_LITERAL) {
                 if (!($set_val = new_object($_GLOBALS, $lex, ++$i, $line, $d["type"]))) return;
             }
@@ -140,7 +140,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!must_end($lex, $i, $line)) return;
         return end_parse(get_display_val($_GLOBALS, $sym["type"], $sym["value"]));
     }
-    return carrot_error_false("unexpected token: " . $lex[0]["value"], $line, 0);
+    return unexpected_token($lex[0], $line);
 }
 
 // return false or value of new object
@@ -182,7 +182,7 @@ function assign(dict $_GLOBALS, vec $lex, int $i, string $e, string $line, strin
 function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, string $line) {
     for (;; $i++) {
         if (!$_GLOBALS["ALL_IDS"]->contains($lex[$i]["type"]))
-            return carrot_error_false("unexpected token: " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
+            return unexpected_token($lex[$i], $line);
         if ($value === null) return carrot_error_false("null pointer exception", $line, $lex[$i - 1]["char_num"]);
         if (!$_GLOBALS["CLASS_MAP"][$type]->contains($lex[$i]["value"]))
             return carrot_and_error($lex[$i]["value"] . " does not exist in class " . $type, $line, $lex[$i]["char_num"]);
@@ -321,7 +321,7 @@ function must_match_unexpected(vec $lex, int $i, string $line, TokenType $e) {
 }
 
 function unexpected_token($token, string $line): boolean {
-    return carrot_error_false("unexpected token " . $token["value"], $line, $token["char_num"]);
+    return carrot_error_false("unexpected token: " . $token["value"], $line, $token["char_num"]);
 }
 
 function expected_but_found(dict $_GLOBALS, $token, string $line, string $e): boolean {
@@ -332,7 +332,7 @@ function expected_but_found(dict $_GLOBALS, $token, string $line, string $e): bo
 function must_end(vec $lex, int $i, string $line): boolean {
     if ($lex[$i]["type"] == TokenType::EOL) return true;
     else if ($lex[$i]["type"] == TokenType::SEMI && $lex[++$i]["type"] == TokenType::EOL) return true;
-    return carrot_error_false("unexpected token: " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
+    return unexpected_token($lex[$i], $line);
 }
 
 // -1 = error, 0 = not ending, 1 = ending
