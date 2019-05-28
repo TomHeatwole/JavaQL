@@ -46,13 +46,15 @@ enum TokenType: int {
     SEMI = 42;
     DOT = 43;
     COMMA = 44;
-    M_GET_CLASSES = 45;
-    M_GET_CLASS_NAMES = 46;
-    M_GET_CLASS = 47;
-    M_GET_ALL_OBJECTS = 48;
-    M_GET_OBJECTS = 49;
-    EOF = 50;
-    EOL = 51;
+    EOL = 45;
+    EOF = 46;
+    M_GET_CLASSES = 47;
+    M_GET_CLASS_NAMES = 48;
+    M_GET_CLASS = 49;
+    M_GET_ALL_OBJECTS = 50;
+    M_GET_OBJECTS = 51;
+    M_BUILD = 52;
+    M_BUILD_ALL = 53;
 }
 
 $_GLOBALS = dict[
@@ -118,6 +120,13 @@ $_GLOBALS = dict[
         TokenType::SEMI => ";",
         TokenType::DOT => ".",
         TokenType::COMMA => ",",
+        TokenType::M_GET_CLASSES => "method name",
+        TokenType::M_GET_CLASS_NAMES => "method name",
+        TokenType::M_GET_CLASS => "method name",
+        TokenType::M_GET_ALL_OBJECTS => "method name",
+        TokenType::M_GET_OBJECTS => "method name",
+        TokenType::M_BUILD => "method name",
+        TokenType::M_BUILD_ALL => "method name",
     ]),
     "JAVA_TYPES" => new Map(dict[
         TokenType::CLASS_ID => "class",
@@ -187,6 +196,8 @@ $_GLOBALS = dict[
         "getClass" => TokenType::M_GET_CLASS, 
         "getAllObjects" => TokenType::M_GET_ALL_OBJECTS,
         "getObjects" => TokenType::M_GET_OBJECTS,
+        "build" => TokenType::M_BUILD,
+        "buildAll" => TokenType::M_BUILD_ALL,
         "new" => TokenType::NEW_LITERAL,
         "null" => TokenType::NULL_LITERAL,
         "true" => TokenType::BOOLEAN_LITERAL,

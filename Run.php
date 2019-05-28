@@ -85,6 +85,22 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
         $result = mysqli_query($_GLOBALS["CONN"], "SELECT * FROM " . $class_name);
         return end_parse(query_result_to_string($_GLOBALS, $result, $class_name));
+    case TokenType::M_BUILD:
+        if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return;
+        if ($lex[$i]["type"] == TokenType::ID) {
+            if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
+            // TODO: code for initial build
+            return;
+        }
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID)) return; // error message is fine here
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
+        // TODO: code for rebuild
+        return;
+    case TokenType::M_BUILD_ALL:
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
+        // code for build all
+        return;
     case TokenType::NEW_LITERAL:
         return new_object($_GLOBALS, $lex, $i, $line, "");
     }
@@ -363,13 +379,14 @@ function end_parse($print) {
     return false;
 }
 
-function carrot_and_error(string $message, string $line, int $index): vec {
+function carrot_and_error(string $message, string $line, int $index) {
     echo $line, "\n", str_repeat(" ", $index), "^\n";
     return error($message);
 }
 
 function error(string $message) {
     echo "Error: ", $message, "\n";
+    return false;
 }
 
 function lex_command(dict $_GLOBALS, string $line) {
