@@ -1,4 +1,7 @@
-<?hh  // strict
+<?hh 
+
+error_reporting(E_ERROR | E_PARSE);
+
 include("Globals.php");
 
 $config_file = fopen('database.txt', 'r');
@@ -56,8 +59,8 @@ $_GLOBALS["SYMBOL_TABLE"] = new Map();
 while (true) {
     $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
     if ($line === "q" || $line === "quit") break;
-    if (!$lex = lex_command($_GLOBALS, $line)) continue;
-    if (count($lex) > 0) parse_and_execute($_GLOBALS, $lex, $line);
+    if (!$lex = lex_line($_GLOBALS, vec[], $line, 0, true, false)) continue;
+    if (count($lex["tokens"]) > 0) parse_and_execute($_GLOBALS, $lex["tokens"], $line);
 }
 
 function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
@@ -87,14 +90,14 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         return end_parse(query_result_to_string($_GLOBALS, $result, $class_name));
     case TokenType::M_BUILD:
         if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return;
-        if ($lex[$i]["type"] === TokenType::ID) {
-            if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
-            // TODO: code for initial build
-            return;
-        }
-        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID)) return; // error message is fine here
+        if ($lex[$i]["type"] !== TokenType::ID && $lex[$i][$type] !== TokenType::CLASS_ID)
+            return expected_but_found($_GLOBALS, $lex[$i], $line, "class name");
+        $class_name = $lex[$i]["value"];
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
-        // TODO: code for rebuild
+        $rebuild = $lex[$i]["type"] === TokenType::CLASS_ID;
+        if (!$lex = lex_file($_GLOBALS, $class_name)) return;
+        $lex = $lex["tokens"];
+        // TODO
         return;
     case TokenType::M_BUILD_ALL:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
@@ -389,10 +392,36 @@ function error(string $message) {
     return false;
 }
 
-function lex_command(dict $_GLOBALS, string $line) {
+function lex_file($_GLOBALS, $class_name) {
+    $file_path = $_GLOBALS["CLASSES_DIR"] . $class_name . ".java";
+    $class_file = fopen($file_path, "r");
+    if (!$class_file)
+        return error("file " . $file_path . " does not exist");
     $ret = vec[];
+    $file_vec = vec[""];
+    $comment = false;
+    $i = 1;
+    for (; $line = fgets($class_file); $i++) {
+        $line = substr($line, 0, strlen($line) - 1);
+        if (!$lex_result = lex_line($_GLOBALS, $ret, $line, $i, false, $comment))
+            return error("\nFound at " . $file_path . ":" . $i);
+        $ret = $lex_result["tokens"];
+        $comment = $lex_result["comment"];
+        $file_vec[] = $line;
+    }
+    $ret[] = shape("type" => TokenType::EOF, "value" => "end of file", "char_num" => 0);
+    return shape("tokens" => $ret, "file_vec" => $file_vec, "file_path" => $file_path);
+}
+
+function lex_line(dict $_GLOBALS, vec $ret, string $line, int $line_num, boolean $command, boolean $comment) {
     // For loop starts on beginning of new token attempt
     for ($i = 0; $i < strlen($line); $i++) {
+        if ($comment) {
+            if ($line[$i] != "*" || $i + 1 >= strlen($line) || $line[$i + 1] != "/") continue;
+            $i++;
+            $comment = false;
+            continue;
+        }
         if ($line[$i] == " ") continue;
 
         // Begins with letter (keyword, boolean literal, ID)
@@ -411,7 +440,7 @@ function lex_command(dict $_GLOBALS, string $line) {
                     $_GLOBALS["JAVA_TYPE_TO_ID"][$j_type] :
                     TokenType::OBJ_ID;
             }
-            $ret[] = shape("type" => $type, "value" => $value, "char_num" => $start);
+            $ret[] = shape("type" => $type, "value" => $value, "char_num" => $start, "line_num" => $line_num);
 
         // int or float literal
         } else if (is_numeric($line[$i])) {
@@ -426,7 +455,8 @@ function lex_command(dict $_GLOBALS, string $line) {
                     $ret[] = shape(
                         "type" => TokenType::STRING_LITERAL,
                         "value" => substr($line, $start, $i - $start + 1),
-                        "char_num" => $start
+                        "char_num" => $start,
+                         "line_num" => $line_num
                     );
                     break;
                 }
@@ -450,19 +480,20 @@ function lex_command(dict $_GLOBALS, string $line) {
             $ret[] = shape(
                 "type" => TokenType::CHAR_LITERAL,
                 "value" => substr($line, $start, $i - $start + 1),
-                "char_num" => $start
+                "char_num" => $start,
+                "line_num" => $line_num
             );
 
         // DOT or float
         } else if ($line[$i] == ".") {
             if ($i + 1 == strlen($line) || !(is_numeric($line[$i + 1]))) {
-                $ret[] = shape("type" => TokenType::DOT, "value" => ".", "char_num" => $i);
+                $ret[] = shape("type" => TokenType::DOT, "value" => ".", "char_num" => $i, "line_num" => $line_num);
             } else {
                 if (!$result = lex_number($line, &$i, true)) return false;
                 $ret[] = $result;
             }
 
-        // Negative number; TODO: Figure out if there are other interpretations of '-'
+        // Negative number;
         } else if ($line[$i] == "-") {
             if ($i + 1 == strlen($line) || !is_numeric($line[$i + 1]))
                 return carrot_and_error("unrecognized symbol: -", $line, $i);
@@ -473,20 +504,34 @@ function lex_command(dict $_GLOBALS, string $line) {
         } else if ($line[$i] == "_") {
             return carrot_and_error("JavaQL identifiers may not begin with an underscore", $line, $i);
 
+        // Comments
+        } else if ($line[$i] == "/") {
+            if ($i + 1 == strlen($line) || ($line[++$i] != "/" && $line[$i] != "*"))
+               carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i); 
+            if ($line[$i] == "/") break; // Rest of line is comment
+            $comment = true; // /* comment has begun
+
         // Symbols 
         } else {
             if ($i + 1 == strlen($line) || !$_GLOBALS["SYMBOLS"]->containsKey($line[$i] . $line[$i + 1])) {
                 if ($_GLOBALS["SYMBOLS"]->containsKey($line[$i]))
-                    $ret[] = shape("type" => $_GLOBALS["SYMBOLS"][$line[$i]], "value" => $line[$i], "char_num" => $i);
+                    $ret[] = shape(
+                        "type" => $_GLOBALS["SYMBOLS"][$line[$i]],
+                        "value" => $line[$i],
+                        "char_num" => $i,
+                        "line_num" => $line_num
+                    );
                 else return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i);
             } else $ret[] = shape(
                 "type" => $_GLOBALS["SYMBOLS"][$line[$i] . $line[$i + 1]],
-                "value" => $line[$i] . $line[++$i], "char_num" => $i - 1
+                "value" => $line[$i] . $line[++$i],
+                "char_num" => $i - 1,
+                "line_num" => $line_num
             );
         } 
     }
-    $ret[] = shape("type" => TokenType::EOL, "value" => "end of line", "char_num" => strlen($line));
-    return $ret;
+    if ($command) $ret[] = shape("type" => TokenType::EOL, "value" => "end of line", "char_num" => strlen($line));
+    return shape("tokens" => $ret, "comment" => $comment);
 }
 
 function lex_number(string $line, int &$i, bool $decimal) {

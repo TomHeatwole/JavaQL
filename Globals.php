@@ -60,7 +60,7 @@ enum TokenType: int {
 $_GLOBALS = dict[
     "PROJECT_NAME" => "JavaQL",
     "PROJECT_URL" => "https://github.com/TomHeatwole/JavaQL/",
-    // Map for 'Type' field 
+    "CLASSES_DIR" => "classes/",
     "FROM_SQL_TYPE_MAP" => dict[
         "varchar(255)" => "String",
         "tinyint(4)" => "byte",
