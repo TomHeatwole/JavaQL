@@ -165,7 +165,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
 function new_object(dict $_GLOBALS, vec $lex, int $i, string $line, string $e) {
     $class_map = $_GLOBALS["CLASS_MAP"];
     if (!($class_name = must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return false;
-    if ($e != "" && $e != $class_name)
+    if ($e !== "" && $e !== $class_name)
         return carrot_and_error("expected " . $e . " but found " . $class_name, $line, $lex[$i]["char_num"]);
     if (!must_match($_GLOBALS, $lex, ++$i, $line, TokenType::L_PAREN)) return false;
     $var_types = $class_map[$class_name]->toValuesArray();
@@ -212,7 +212,7 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
         $parent = shape("type" => $type, "value" => $value);
         $value = mysqli_fetch_row($result)[0];
         $type = $class_var_type;
-        if ($lex[++$i]["type"] != TokenType::DOT || $is_primitive) break;
+        if ($lex[++$i]["type"] !== TokenType::DOT || $is_primitive) break;
     }
     return shape("parent" => $parent, "value" => $value, "type" => $type, "row_name" => $row_name);
 }
@@ -229,7 +229,7 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
             if (!$d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line)) return false;
             return $d["value"];
         }
-        if ($sym["type"] != $e) return expected_but_found($_GLOBALS, $token, $line, $e);
+        if ($sym["type"] !== $e) return expected_but_found($_GLOBALS, $token, $line, $e);
         return $sym["value"];
     case TokenType::INT_LITERAL:
         $int_val = (int)$token["value"];
@@ -238,13 +238,13 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
             return carrot_and_error("int literal is too large for type float", $line, $token["char_num"]);
         }
         if ($e === "double") {
-            if ((double)$token["value"] != INF) return $token["value"];
+            if ((double)$token["value"] !== INF) return $token["value"];
             return carrot_and_error("int literal is too large for type double", $line, $token["char_num"]);
         }
         if ($_GLOBALS["INT_MAX"]->containsKey($e)) {
             $max = $_GLOBALS["INT_MAX"][$e];
             // TODO: Figure out how to check for longs on a 32 bit machine
-            if ("" . $int_val != $token["value"])
+            if ("" . $int_val !== $token["value"])
                 return carrot_and_error("integer value too large", $line, $token["char_num"]);
             if ($int_val > $max || -$int_val > $max + 1)
                 return carrot_and_error("integer value " . $int_val .
@@ -327,13 +327,13 @@ function r_paren_semi(dict $_GLOBALS, $lex, int $i, string $line): boolean {
 
 // Returns value of matched type on success or false on failure
 function must_match(dict $_GLOBALS, vec $lex, int $i, string $line, TokenType $e) {
-    if ($lex[$i]["type"] != $e)
+    if ($lex[$i]["type"] !== $e)
         return expected_but_found($_GLOBALS, $lex[$i], $line, $_GLOBALS["TOKEN_NAME_MAP"][$e]);
     return $lex[$i]["value"];
 }
 
 function must_match_unexpected(vec $lex, int $i, string $line, TokenType $e) {
-    if ($lex[$i]["type"] != $e)
+    if ($lex[$i]["type"] !== $e)
         return unexpected_token($lex[$i], $line);
     return $lex[$i]["value"];
 }
@@ -417,18 +417,18 @@ function lex_line(dict $_GLOBALS, vec $ret, string $line, int $line_num, boolean
     // For loop starts on beginning of new token attempt
     for ($i = 0; $i < strlen($line); $i++) {
         if ($comment) {
-            if ($line[$i] != "*" || $i + 1 >= strlen($line) || $line[$i + 1] != "/") continue;
+            if ($line[$i] !== "*" || $i + 1 >= strlen($line) || $line[$i + 1] !== "/") continue;
             $i++;
             $comment = false;
             continue;
         }
-        if ($line[$i] == " ") continue;
+        if ($line[$i] === " ") continue;
 
         // Begins with letter (keyword, boolean literal, ID)
         if (ctype_alpha($line[$i])) {
             $start = $i;
             for (; $i < strlen($line) - 1; $i++) {
-                if (!ctype_alpha($line[$i + 1]) && !is_numeric($line[$i + 1]) && $line[$i + 1] != "_") break;
+                if (!ctype_alpha($line[$i + 1]) && !is_numeric($line[$i + 1]) && $line[$i + 1] !== "_") break;
             }
             $value = substr($line, $start, $i - $start + 1);
             $type = TokenType::ID;
@@ -448,10 +448,10 @@ function lex_line(dict $_GLOBALS, vec $ret, string $line, int $line_num, boolean
             $ret[] = $result;
 
         // String literal
-        } else if ($line[$i] == "\"") {
+        } else if ($line[$i] === "\"") {
             $start = $i;
             for ($i++; $i < strlen($line); $i++) {
-                if ($line[$i] == "\"" && $line[$i - 1] != "\\") {
+                if ($line[$i] === "\"" && $line[$i - 1] !== "\\") {
                     $ret[] = shape(
                         "type" => TokenType::STRING_LITERAL,
                         "value" => substr($line, $start, $i - $start + 1),
@@ -461,21 +461,21 @@ function lex_line(dict $_GLOBALS, vec $ret, string $line, int $line_num, boolean
                     break;
                 }
             }
-            if ($i == strlen($line)) return carrot_and_error("unclosed quotation", $line, $start);
+            if ($i === strlen($line)) return carrot_and_error("unclosed quotation", $line, $start);
 
         // Char literal
-        } else if ($line[$i] == "'") {
-            if ($i + 1 == strlen($line)) return carrot_and_error("unclosed char literal", $line, $start);
+        } else if ($line[$i] === "'") {
+            if ($i + 1 === strlen($line)) return carrot_and_error("unclosed char literal", $line, $start);
             $start = $i;
             $c = $line[++$i];
-            if ($c == "'") return carrot_and_error("empty char literal", $line, $start);
-            if ($c == "\\") { // TODO: Add support for unicode escape sequences
+            if ($c === "'") return carrot_and_error("empty char literal", $line, $start);
+            if ($c === "\\") { // TODO: Add support for unicode escape sequences
                 if ($i + 2 >= strlen($line)) return carrot_and_error("unclosed char literal", $line, $start);
-                if ($line[$i += 2] != "'" || !$_GLOBALS["ESCAPE_CHARS"]->contains($line[$i - 1]))
+                if ($line[$i += 2] !== "'" || !$_GLOBALS["ESCAPE_CHARS"]->contains($line[$i - 1]))
                     return carrot_and_error("invalid char literal", $line, $start);
             } else {
                 if ($i + 1 >= strlen($line)) return carrot_and_error("unclosed char literal", $line, $start);
-                if ($line[++$i] != "'") return carrot_and_error("invalid char literal", $line, $start);
+                if ($line[++$i] !== "'") return carrot_and_error("invalid char literal", $line, $start);
             }
             $ret[] = shape(
                 "type" => TokenType::CHAR_LITERAL,
@@ -485,8 +485,8 @@ function lex_line(dict $_GLOBALS, vec $ret, string $line, int $line_num, boolean
             );
 
         // DOT or float
-        } else if ($line[$i] == ".") {
-            if ($i + 1 == strlen($line) || !(is_numeric($line[$i + 1]))) {
+        } else if ($line[$i] === ".") {
+            if ($i + 1 === strlen($line) || !(is_numeric($line[$i + 1]))) {
                 $ret[] = shape("type" => TokenType::DOT, "value" => ".", "char_num" => $i, "line_num" => $line_num);
             } else {
                 if (!$result = lex_number($line, &$i, true)) return false;
@@ -494,26 +494,26 @@ function lex_line(dict $_GLOBALS, vec $ret, string $line, int $line_num, boolean
             }
 
         // Negative number;
-        } else if ($line[$i] == "-") {
-            if ($i + 1 == strlen($line) || !is_numeric($line[$i + 1]))
+        } else if ($line[$i] === "-") {
+            if ($i + 1 === strlen($line) || !is_numeric($line[$i + 1]))
                 return carrot_and_error("unrecognized symbol: -", $line, $i);
             if (!$result = lex_number($line, &$i, false)) return false;
             $ret[] = $result;
 
         // Underscore error
-        } else if ($line[$i] == "_") {
+        } else if ($line[$i] === "_") {
             return carrot_and_error("JavaQL identifiers may not begin with an underscore", $line, $i);
 
         // Comments
-        } else if ($line[$i] == "/") {
-            if ($i + 1 == strlen($line) || ($line[++$i] != "/" && $line[$i] != "*"))
+        } else if ($line[$i] === "/") {
+            if ($i + 1 === strlen($line) || ($line[++$i] !== "/" && $line[$i] !== "*"))
                carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i); 
-            if ($line[$i] == "/") break; // Rest of line is comment
+            if ($line[$i] === "/") break; // Rest of line is comment
             $comment = true; // /* comment has begun
 
         // Symbols 
         } else {
-            if ($i + 1 == strlen($line) || !$_GLOBALS["SYMBOLS"]->containsKey($line[$i] . $line[$i + 1])) {
+            if ($i + 1 === strlen($line) || !$_GLOBALS["SYMBOLS"]->containsKey($line[$i] . $line[$i + 1])) {
                 if ($_GLOBALS["SYMBOLS"]->containsKey($line[$i]))
                     $ret[] = shape(
                         "type" => $_GLOBALS["SYMBOLS"][$line[$i]],
@@ -539,14 +539,14 @@ function lex_number(string $line, int &$i, bool $decimal) {
     $e = false;
     $invalid = false;
     for (; $i < strlen($line) - 1; $i++) {
-        if ($line[$i + 1] == ".") {
+        if ($line[$i + 1] === ".") {
             if ($decimal || $e) $invalid = true;
             $decimal = true;
-        } else if ($line[$i + 1] == 'e' || $line[$i + 1] == "E") {
-            if ($e || ++$i + 1 == strlen($line)) $invalid = true;
+        } else if ($line[$i + 1] === 'e' || $line[$i + 1] === "E") {
+            if ($e || ++$i + 1 === strlen($line)) $invalid = true;
             else if (!is_numeric($line[$i + 1])) {
-                if (($line[$i + 1] != "-" && $line[$i + 1] != "+") ||
-                    ++$i + 1 == strlen($line) || !is_numeric($line[$i + 1])) $invalid = true;
+                if (($line[$i + 1] !== "-" && $line[$i + 1] !== "+") ||
+                    ++$i + 1 === strlen($line) || !is_numeric($line[$i + 1])) $invalid = true;
             }
             $e = true;
         } else if (!is_numeric($line[$i + 1])) break;
