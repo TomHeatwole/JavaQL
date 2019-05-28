@@ -260,10 +260,14 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     case TokenType::STRING_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["String"]));
     case TokenType::FLOAT_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["float", "double"]));
     case TokenType::DOUBLE_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["double"]));
-    case TokenType::BYTE_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["byte", "short", "int", "long"]));
-    case TokenType::SHORT_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["short", "int", "long"]));
-    case TokenType::INT_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["int", "long"]));
-    case TokenType::LONG_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["long"]));
+    case TokenType::BYTE_ID:
+        return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["byte", "short", "int", "long", "float", "double"]));
+    case TokenType::SHORT_ID:
+        return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["short", "int", "long", "float", "double"]));
+    case TokenType::INT_ID:
+        return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["int", "long", "float", "double"]));
+    case TokenType::LONG_ID:
+        return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["long", "float", "double"]));
     default: return expected_but_found($_GLOBALS, $token, $line, $e);
     }
 }
