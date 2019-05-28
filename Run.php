@@ -113,23 +113,28 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 $_GLOBALS["SYMBOL_TABLE"][$name] = shape("value" => $new_val, "type" => $e);
                 return;
             }
-            return lex_error("NOT IMPLEMENTED");
+            $i--;
         }
-        return assign_prim($_GLOBALS, $lex, ++$i, $e, $line, $name);
+        return assign($_GLOBALS, $lex, ++$i, $e, $line, $name);
     }
     if ($_GLOBALS["VAR_IDS"]->contains($lex[0]["type"])) {
         $sym = $_GLOBALS["SYMBOL_TABLE"][$lex[0]["value"]];
-        if ($lex[0]["type"] == TokenType::OBJ_ID) {
-            if ($lex[$i]["type"] == TokenType::DOT) {
-                $i++;
-                if (!($d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line))) return;
-                // TODO check for assign and end
-                if (!must_end($lex, $i, $line)) return;
-                return end_parse(get_display_val($_GLOBALS, $d["type"], $d["value"]));
+        if ($lex[0]["type"] == TokenType::OBJ_ID && $lex[$i]["type"] == TokenType::DOT) {
+            $i++;
+            if (!($d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line))) return;
+            if (check_end($lex, $i, $line)) return end_parse(get_display_val($_GLOBALS, $d["type"], $d["value"]));
+            if ($lex[$i]["type"] != TokenType::ASSIGN) return parse_error("TODO error");
+            if ($lex[++$i]["type"] == TokenType::NEW_LITERAL) {
+                if (!($set_val = new_object($_GLOBALS, $lex, ++$i, $line, $d["type"]))) return;
             }
+            else if (($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"])) === false) return;
+            else if (!must_end($lex, $i, $line)) return;
+            if (!mysqli_query($_GLOBALS["CONN"], "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=" .
+                $set_val . " WHERE _id=" . $d["parent"]["value"])) return parse_error("an unknown MySQL error occurred");
+            return;
         }
         if ($lex[$i]["type"] == TokenType::ASSIGN)
-            return assign_prim($_GLOBALS, $lex, ++$i, $sym["type"], $line, $lex[0]["value"]);
+            return assign($_GLOBALS, $lex, ++$i, $sym["type"], $line, $lex[0]["value"]);
         if (!must_end($lex, $i, $line)) return;
         return end_parse(get_display_val($_GLOBALS, $sym["type"], $sym["value"]));
     }
@@ -165,19 +170,16 @@ function new_object(dict $_GLOBALS, vec $lex, int $i, string $line, string $e) {
     if (!mysqli_query($_GLOBALS["CONN"], $query . ")"))
         return parse_error("an unknown MySQL error occurred");
     return mysqli_fetch_row(mysqli_query($_GLOBALS["CONN"], "SELECT LAST_INSERT_ID()"))[0];
-    // TODO:
-    // add to class name = new class(...)
-    // add to name = new class(...)
 }
 
-function assign_prim(dict $_GLOBALS, vec $lex, int $i, string $e, string $line, string $name) {
+function assign(dict $_GLOBALS, vec $lex, int $i, string $e, string $line, string $name) {
     if (($val = parse_type($_GLOBALS, $lex, &$i, $line, $e)) === false) return;
     if (!must_end($lex, $i, $line)) return;
     $_GLOBALS["SYMBOL_TABLE"][$name] = shape("type" => $e, "value" => $val);
 }
 
 function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, string $line) {
-    for (;;$i++) {
+    for (;; $i++) {
         if (!$_GLOBALS["ALL_IDS"]->contains($lex[$i]["type"]))
             return carrot_error_false("unexpected token: " . $lex[$i]["value"], $line, $lex[$i]["char_num"]);
         if ($value === null) return carrot_error_false("null pointer exception", $line, $lex[$i - 1]["char_num"]);
@@ -193,7 +195,7 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
         $type = $class_var_type;
         if ($lex[++$i]["type"] != TokenType::DOT || $is_primitive) break;
     }
-    return shape("parent" => $parent, "value" => $value, "type" => $type);
+    return shape("parent" => $parent, "value" => $value, "type" => $type, "row_name" => $row_name);
 }
 
 // return value if parsed correctly or false otherwise

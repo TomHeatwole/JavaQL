@@ -77,6 +77,7 @@ $_GLOBALS = dict[
         TokenType::STRING_LITERAL => "String",
         TokenType::CHAR_LITERAL => "char",
         TokenType::NULL_LITERAL => "null",
+        TokenType::NEW_LITERAL => "new",
         TokenType::CLASS_ID => "class name",
         TokenType::ID => "unknown identifier",
         TokenType::BYTE_ID => "byte variable",
