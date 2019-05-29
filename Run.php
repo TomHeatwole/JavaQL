@@ -108,7 +108,13 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         }
         if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::L_CURLY))
             return found_location($file_path, $lex[$i]["line_num"]);
-        // TODO: rest of file
+        $vars = vec[];
+        while ($lex[++$i]["type"] !== TokenType::R_CURLY) {
+            // TODO: parse class variables
+        }
+        if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::EOF))
+            return found_location($file_path, $lex[$i]["line_num"]);
+        error("VALID"); // TODO
         return;
     case TokenType::M_BUILD_ALL:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
