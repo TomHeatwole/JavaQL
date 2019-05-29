@@ -73,6 +73,17 @@ $_GLOBALS = dict[
         "float" => "float",
         "double" => "double",
     ],
+    "TO_SQL_TYPE_MAP" => dict[
+        "String" => "varchar(255)",
+        "byte" => "tinyint(4)",
+        "short" => "smallint(6)",
+        "int" => "int(11)",
+        "long" => "bigint(20)",
+        "char" => "char(1)",
+        "boolean" => "tinyint(1)",
+        "float" => "float",
+        "double" => "double",
+    ],
     "TOKEN_NAME_MAP" => new Map(dict[
         TokenType::INT_LITERAL => "\"int\"",
         TokenType::FLOAT_LITERAL => "\"float\"",

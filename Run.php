@@ -110,16 +110,42 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             return found_location($file_path, $lex[$i]["line_num"]);
         $vars = vec[];
         while ($lex[++$i]["type"] !== TokenType::R_CURLY) {
-            // TODO: parse class variables
+            if (!$_GLOBALS["JAVA_TYPES"]->containsKey($lex[$i]["type"])) {
+                unexpected_token($lex[$i], $file_vec[$lex[$i]["line_num"]]);
+                return found_location($file_path, $lex[$i]["line_num"]);
+            }
+            $type = $lex[$i]["value"];
+            if (!$_GLOBALS["ALL_IDS"]->contains($lex[++$i]["type"]))
+                return unexpected_token($lex[$i], $file_vec[$lex[$i]["line_num"]]);
+            $name = $lex[$i]["value"];
+            // TODO: Right here is where we'd allow a default option ex. int i = 5;
+            if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::SEMI))
+                return found_location($file_path, $lex[$i]["line_num"]);
+            $vars[] = shape("type" => $type, "name" => $name);
         }
         if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::EOF))
             return found_location($file_path, $lex[$i]["line_num"]);
-        error("VALID"); // TODO
+        if (!$rebuild) {
+            $var_map = dict[];
+            $query = "CREATE TABLE " . $class_name . " (_id int NOT NULL AUTO_INCREMENT";
+            foreach ($vars as $var) {
+                $var_map[$var["name"]] = $var["type"];
+                $sql_column = get_column($_GLOBALS, $var["type"], $var["name"]);
+                $query .= ", " . $sql_column["name"] . " " . $sql_column["type"];
+            }
+            if (!mysqli_query($_GLOBALS["CONN"], $query . ", PRIMARY KEY(_id))"))
+                return error("an unknown MySQL error occurred");
+            $_GLOBALS["CLASS_MAP"][$class_name] = new Map($var_map);
+            return;
+        }
+        // TODO: Code for rebuild
         return;
     case TokenType::M_BUILD_ALL:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
-        // code for build all
+        // TODO: code for build all
+        // - Start by asking if we want to delete any existing tables we don't find a .java for
+        error("NOT IMPLEMENTED");
         return;
     case TokenType::NEW_LITERAL:
         return new_object($_GLOBALS, $lex, $i, $line, "");
@@ -389,6 +415,12 @@ function check_end(vec $lex, int $i, string $line): int {
         return -1;
     } 
     return 0;
+}
+
+function get_column(dict $_GLOBALS, string $type, string $name) {
+    return $_GLOBALS["PRIM"]->contains($type)
+        ? shape("type" => $_GLOBALS["TO_SQL_TYPE_MAP"][$type], "name" => $name)
+        : shape("type" => "int", "name" => java_ref_to_mysql($type, $name));
 }
 
 function mysql_ref_to_java(string $name): shape("type" => string, "name" => string) {
