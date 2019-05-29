@@ -57,18 +57,39 @@ $_GLOBALS["symbol_table"] = new Map();
 
 // Begin CLI 
 while (true) {
+    $_GLOBALS["query_queue"] = new Vector();
+    $_GLOBALS["assign"] = new Map();
     $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
     if ($line === "q" || $line === "quit") break;
     if (!$lex = lex_line($_GLOBALS, vec[], $line, 0, true, false)) continue;
-    if (count($lex["tokens"]) > 0) parse_and_execute($_GLOBALS, $lex["tokens"], $line);
+    if (!parse_and_execute($_GLOBALS, $lex["tokens"], $line)) continue;
+    $query_results = new Vector();
+    $quit = false;
+    for ($i = 0; $i < count($_GLOBALS["query_queue"]); $i++) {
+        $query_pieces = $_GLOBALS["query_queue"][$i];
+        for ($j = 0; $j < count($query_pieces); $j++)
+            if (is_int($query_pieces[$j])) $query_pieces[$j] = mysqli_fetch_row($query_results[$query_pieces[$j]])[0];
+        if (!$result = mysqli_query($_GLOBALS["conn"], implode($query_pieces))) {
+            error($_GLOBALS["MYSQL_ERROR"]);
+            $quit = true;
+        }
+        if ($quit) break;
+        $query_results[] = $result;
+    }
+    if ($quit) continue;
+    $assign = $_GLOBALS["assign"];
+    if (count($assign) === 0) continue;
+    $_GLOBALS["symbol_table"][$assign["name"]] = shape(
+        "type" => $assign["type"],
+        "value" => mysqli_fetch_row($query_results[$assign["q_num"]])[0],
+    );
 }
 
 function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
+    if (count($lex) == 0) return false;
     $class_map = $_GLOBALS["class_map"];
     $i = 1;
     switch ($lex[0]["type"]) {
-    case TokenType::EOL:
-        return;
     case TokenType::M_GET_CLASSES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
@@ -151,7 +172,9 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         error("NOT IMPLEMENTED");
         return;
     case TokenType::NEW_LITERAL:
-        return new_object($_GLOBALS, $lex, $i, $line, "");
+        if (!new_object($_GLOBALS, $lex, &$i, $line, "")) return false;
+        return must_end($lex, $i, $line);
+
     }
     if ($_GLOBALS["JAVA_TYPES"]->containsKey($lex[0]["type"])) {
         $j_type = $_GLOBALS["JAVA_TYPES"][$lex[0]["type"]];
@@ -170,14 +193,6 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             return;
         }
         if (!must_match_unexpected($lex, $i, $line, TokenType::ASSIGN)) return;
-        if ($j_type === "class") {
-            if ($lex[++$i]["type"] === TokenType::NEW_LITERAL) {
-                if (!$new_val = new_object($_GLOBALS, $lex, ++$i, $line, $e)) return false;
-                $_GLOBALS["symbol_table"][$name] = shape("value" => $new_val, "type" => $e);
-                return;
-            }
-            $i--;
-        }
         return assign($_GLOBALS, $lex, ++$i, $e, $line, $name);
     }
     if ($_GLOBALS["VAR_IDS"]->contains($lex[0]["type"])) {
@@ -189,15 +204,18 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 if ($end === -1) return;
                 return end_parse(get_display_val($_GLOBALS, $d["type"], $d["value"]));
             }
-            if (!must_match_unexpected($lex, $i, $line, TokenType::ASSIGN)) return;
-            if ($lex[++$i]["type"] === TokenType::NEW_LITERAL) {
-                if (!($set_val = new_object($_GLOBALS, $lex, ++$i, $line, $d["type"]))) return;
-            }
-            else if (($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"])) === false) return;
+            if (!must_match_unexpected($lex, $i++, $line, TokenType::ASSIGN)) return;
+            if (($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"])) === false) return;
             else if (!must_end($lex, $i, $line)) return;
-            if (!mysqli_query($_GLOBALS["conn"], "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=" .
-                $set_val . " WHERE _id=" . $d["parent"]["value"])) return error($_GLOBALS["MYSQL_ERROR"]);
-            return;
+            $query = "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=";
+            if ($set_val instanceof QueryResult) {
+                $query_pieces = vec[$query];
+                $query_pieces[] = $set_val->q_num;
+                $query_pieces[] = " WHERE _id=" . $d["parent"]["value"];
+                $_GLOBALS["query_queue"][] = $query_pieces;
+            } else if (!mysqli_query($_GLOBALS["conn"], $query . $set_val .
+                " WHERE _id=" . $d["parent"]["value"])) return error($_GLOBALS["MYSQL_ERROR"]);
+            return true;
         }
         if ($lex[$i]["type"] === TokenType::ASSIGN)
             return assign($_GLOBALS, $lex, ++$i, $sym["type"], $line, $lex[0]["value"]);
@@ -208,7 +226,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
 }
 
 // return false or value of new object
-function new_object(dict $_GLOBALS, vec $lex, int $i, string $line, string $e) {
+function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) {
     $class_map = $_GLOBALS["class_map"];
     if (!($class_name = must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return false;
     if ($e !== "" && $e !== $class_name)
@@ -227,19 +245,32 @@ function new_object(dict $_GLOBALS, vec $lex, int $i, string $line, string $e) {
         }
         if ($j + 1 < count($var_types) && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return;
     }
-    if (!r_paren_semi($_GLOBALS, $lex, $i, $line)) return false;
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
+    $query_pieces = vec[];
     $query = "INSERT INTO " . $class_name . " VALUES (default";
     for ($j = 0; $j < count($var_types); $j++) {
-        $query .= ", " . (($var_values[$j] === null) ? "null" : $var_values[$j]);
+        if ($var_values[$j] instanceof QueryResult) {
+            $query_pieces[] = $query . ", ";
+            $query_pieces[] = $var_values[$j]->q_num;
+            $query = "";
+        } else $query .= ", " . (($var_values[$j] === null) ? "null" : $var_values[$j]);
     }
-    if (!mysqli_query($_GLOBALS["conn"], $query . ")")) return error($_GLOBALS["MYSQL_ERROR"]);
-    return mysqli_fetch_row(mysqli_query($_GLOBALS["conn"], "SELECT LAST_INSERT_ID()"))[0];
+    $query_pieces[] = $query . ")";
+    $_GLOBALS["query_queue"][] = $query_pieces;
+    $_GLOBALS["query_queue"][] = vec["SELECT LAST_INSERT_ID()"];
+    return new QueryResult(count($_GLOBALS["query_queue"]) - 1);
 }
 
 function assign(dict $_GLOBALS, vec $lex, int $i, string $e, string $line, string $name) {
     if (($val = parse_type($_GLOBALS, $lex, &$i, $line, $e)) === false) return;
     if (!must_end($lex, $i, $line)) return;
-    $_GLOBALS["symbol_table"][$name] = shape("type" => $e, "value" => $val);
+    if ($val instanceof QueryResult) {
+        $_GLOBALS["assign"]["name"] = $name;
+        $_GLOBALS["assign"]["q_num"] = $val->q_num;
+        $_GLOBALS["assign"]["type"] = $e;
+    }
+    else $_GLOBALS["symbol_table"][$name] = shape("type" => $e, "value" => $val);
+    return true;
 }
 
 function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, string $line) {
@@ -268,6 +299,8 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     // TODO: Implement default
     $token = $lex[$i++];
     switch($token["type"]) {
+    case TokenType::NEW_LITERAL:
+        return ($value = new_object($_GLOBALS, $lex, &$i, $line, $e)) ? $value : false;
     case TokenType::OBJ_ID:
         $sym = $_GLOBALS["symbol_table"][$token["value"]];
         if ($lex[$i]["type"] === TokenType::DOT) {

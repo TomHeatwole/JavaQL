@@ -1,5 +1,13 @@
 <?hh 
 
+class QueryResult {
+    public int $q_num;
+
+    public function __construct(int $q_num) {
+        $this->q_num = $q_num;
+    }
+}
+
 enum TokenType: int {
     INT_LITERAL = 0;
     FLOAT_LITERAL = 1;
