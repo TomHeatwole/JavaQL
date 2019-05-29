@@ -134,7 +134,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 $query .= ", " . $sql_column["name"] . " " . $sql_column["type"];
             }
             if (!mysqli_query($_GLOBALS["CONN"], $query . ", PRIMARY KEY(_id))"))
-                return error("an unknown MySQL error occurred");
+                return error($_GLOBALS["MYSQL_ERROR"]);
             $_GLOBALS["CLASS_MAP"][$class_name] = new Map($var_map);
             return;
         }
@@ -193,7 +193,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             else if (($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"])) === false) return;
             else if (!must_end($lex, $i, $line)) return;
             if (!mysqli_query($_GLOBALS["CONN"], "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=" .
-                $set_val . " WHERE _id=" . $d["parent"]["value"])) return error("an unknown MySQL error occurred");
+                $set_val . " WHERE _id=" . $d["parent"]["value"])) return error($_GLOBALS["MYSQL_ERROR"]);
             return;
         }
         if ($lex[$i]["type"] === TokenType::ASSIGN)
@@ -229,8 +229,7 @@ function new_object(dict $_GLOBALS, vec $lex, int $i, string $line, string $e) {
     for ($j = 0; $j < count($var_types); $j++) {
         $query .= ", " . (($var_values[$j] === null) ? "null" : $var_values[$j]);
     }
-    if (!mysqli_query($_GLOBALS["CONN"], $query . ")"))
-        return error("an unknown MySQL error occurred");
+    if (!mysqli_query($_GLOBALS["CONN"], $query . ")")) return error($_GLOBALS["MYSQL_ERROR"]);
     return mysqli_fetch_row(mysqli_query($_GLOBALS["CONN"], "SELECT LAST_INSERT_ID()"))[0];
 }
 
@@ -246,12 +245,13 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
             return unexpected_token($lex[$i], $line);
         if ($value === null) return carrot_and_error("null pointer exception", $line, $lex[$i - 1]["char_num"]);
         if (!$_GLOBALS["CLASS_MAP"][$type]->contains($lex[$i]["value"]))
-            return carrot_and_error($lex[$i]["value"] . " does not exist in class " . $type, $line, $lex[$i]["char_num"]);
+            return carrot_and_error($lex[$i]["value"] .
+            " does not exist in class " . $type, $line, $lex[$i]["char_num"]);
         $class_var_type = $_GLOBALS["CLASS_MAP"][$type][$lex[$i]["value"]];
         $is_primitive = $_GLOBALS["PRIM"]->contains($class_var_type);
         $row_name =  $is_primitive ? $lex[$i]["value"] : java_ref_to_mysql($class_var_type, $lex[$i]["value"]); 
         $result = mysqli_query($_GLOBALS["CONN"], "SELECT " . $row_name . " FROM " . $type . " WHERE _id=" . $value);
-        if (!$result) return error("an unnown MySXQL error occurred");
+        if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
         $parent = shape("type" => $type, "value" => $value);
         $value = mysqli_fetch_row($result)[0];
         $type = $class_var_type;
@@ -370,7 +370,8 @@ function r_paren_semi(dict $_GLOBALS, $lex, int $i, string $line): boolean {
 
 function must_match_f(dict $_GLOBALS, vec $lex, int $i, vec $file_vec, TokenType $e) {
     if ($lex[$i]["type"] !== $e)
-        return expected_but_found($_GLOBALS, $lex[$i], $file_vec[$lex[$i]["line_num"]], $_GLOBALS["TOKEN_NAME_MAP"][$e]);
+        return expected_but_found($_GLOBALS, $lex[$i],
+            $file_vec[$lex[$i]["line_num"]], $_GLOBALS["TOKEN_NAME_MAP"][$e]);
     return $lex[$i]["value"];
 }
 
