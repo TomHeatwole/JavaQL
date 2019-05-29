@@ -19,23 +19,23 @@ fclose($config_file);
 
 // Create connection
 echo "Attempting to connect to database...\n";
-$_GLOBALS["CONN"] = mysqli_connect(trim($host), trim($username), trim($password), trim($database));
+$_GLOBALS["conn"] = mysqli_connect(trim($host), trim($username), trim($password), trim($database));
 
 // Check connection
-if (!$_GLOBALS["CONN"]) { // In this case the connection attempt gave a warning
+if (!$_GLOBALS["conn"]) { // In this case the connection attempt gave a warning
     die($_GLOBALS["PROJECT_NAME"] . "Error: Failed to connect due to warning above.\n");
 }
-if ($_GLOBALS["CONN"]->connect_error) {
-    die($_GLOBALS["PROJECT_NAME"] . "Error: Connection failed: " . $_GLOBALS["CONN"]->connect_error . "\n");
+if ($_GLOBALS["conn"]->connect_error) {
+    die($_GLOBALS["PROJECT_NAME"] . "Error: Connection failed: " . $_GLOBALS["conn"]->connect_error . "\n");
 }
 echo "Connected successfully\n";
 
 // Load Classes
 echo "Loading classes...\n";
 $class_map = dict[];
-$result = mysqli_query($_GLOBALS["CONN"], "show tables");
+$result = mysqli_query($_GLOBALS["conn"], "show tables");
 while ($row = mysqli_fetch_row($result)) {
-    $class = mysqli_query($_GLOBALS["CONN"], "describe " . $row[0]);
+    $class = mysqli_query($_GLOBALS["conn"], "describe " . $row[0]);
     $vars = dict[];
     while ($var = mysqli_fetch_assoc($class)) {
         $name = $var['Field'];
@@ -51,9 +51,9 @@ while ($row = mysqli_fetch_row($result)) {
 }
 echo "Classes loaded\n\n";
 
-$_GLOBALS["CONN"] = $_GLOBALS["CONN"];
-$_GLOBALS["CLASS_MAP"] = new Map($class_map);
-$_GLOBALS["SYMBOL_TABLE"] = new Map();
+$_GLOBALS["conn"] = $_GLOBALS["conn"];
+$_GLOBALS["class_map"] = new Map($class_map);
+$_GLOBALS["symbol_table"] = new Map();
 
 // Begin CLI 
 while (true) {
@@ -64,7 +64,7 @@ while (true) {
 }
 
 function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
-    $class_map = $_GLOBALS["CLASS_MAP"];
+    $class_map = $_GLOBALS["class_map"];
     $i = 1;
     switch ($lex[0]["type"]) {
     case TokenType::EOL:
@@ -86,7 +86,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
-        $result = mysqli_query($_GLOBALS["CONN"], "SELECT * FROM " . $class_name);
+        $result = mysqli_query($_GLOBALS["conn"], "SELECT * FROM " . $class_name);
         return end_parse(query_result_to_string($_GLOBALS, $result, $class_name));
     case TokenType::M_BUILD:
         if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return;
@@ -133,9 +133,9 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 $sql_column = get_column($_GLOBALS, $var["type"], $var["name"]);
                 $query .= ", " . $sql_column["name"] . " " . $sql_column["type"];
             }
-            if (!mysqli_query($_GLOBALS["CONN"], $query . ", PRIMARY KEY(_id))"))
+            if (!mysqli_query($_GLOBALS["conn"], $query . ", PRIMARY KEY(_id))"))
                 return error($_GLOBALS["MYSQL_ERROR"]);
-            $_GLOBALS["CLASS_MAP"][$class_name] = new Map($var_map);
+            $_GLOBALS["class_map"][$class_name] = new Map($var_map);
             return;
         }
         // TODO: Code for rebuild
@@ -145,6 +145,9 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
         // TODO: code for build all
         // - Start by asking if we want to delete any existing tables we don't find a .java for
+        // - Accumulate list of classes based on what exists (and isn't getting deleted) and what's in the directory
+        // - Attempt to parse each file using mostly the code from build and queue up queries
+        // - write code for rebuild before attempting this
         error("NOT IMPLEMENTED");
         return;
     case TokenType::NEW_LITERAL:
@@ -163,14 +166,14 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         $name = $lex[$i]["value"];
         if ($end = check_end($lex, ++$i, $line)) {
             if ($end === -1) return;
-            $_GLOBALS["SYMBOL_TABLE"][$name] = shape("type" => $e, "value" => $_GLOBALS["DEFAULTS"][$j_type]);
+            $_GLOBALS["symbol_table"][$name] = shape("type" => $e, "value" => $_GLOBALS["DEFAULTS"][$j_type]);
             return;
         }
         if (!must_match_unexpected($lex, $i, $line, TokenType::ASSIGN)) return;
         if ($j_type === "class") {
             if ($lex[++$i]["type"] === TokenType::NEW_LITERAL) {
                 if (!$new_val = new_object($_GLOBALS, $lex, ++$i, $line, $e)) return false;
-                $_GLOBALS["SYMBOL_TABLE"][$name] = shape("value" => $new_val, "type" => $e);
+                $_GLOBALS["symbol_table"][$name] = shape("value" => $new_val, "type" => $e);
                 return;
             }
             $i--;
@@ -178,7 +181,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         return assign($_GLOBALS, $lex, ++$i, $e, $line, $name);
     }
     if ($_GLOBALS["VAR_IDS"]->contains($lex[0]["type"])) {
-        $sym = $_GLOBALS["SYMBOL_TABLE"][$lex[0]["value"]];
+        $sym = $_GLOBALS["symbol_table"][$lex[0]["value"]];
         if ($lex[0]["type"] === TokenType::OBJ_ID && $lex[$i]["type"] === TokenType::DOT) {
             $i++;
             if (!($d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line))) return;
@@ -192,7 +195,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             }
             else if (($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"])) === false) return;
             else if (!must_end($lex, $i, $line)) return;
-            if (!mysqli_query($_GLOBALS["CONN"], "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=" .
+            if (!mysqli_query($_GLOBALS["conn"], "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=" .
                 $set_val . " WHERE _id=" . $d["parent"]["value"])) return error($_GLOBALS["MYSQL_ERROR"]);
             return;
         }
@@ -206,7 +209,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
 
 // return false or value of new object
 function new_object(dict $_GLOBALS, vec $lex, int $i, string $line, string $e) {
-    $class_map = $_GLOBALS["CLASS_MAP"];
+    $class_map = $_GLOBALS["class_map"];
     if (!($class_name = must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return false;
     if ($e !== "" && $e !== $class_name)
         return expected_but_found_literal($lex[$i], $line, $e);
@@ -229,14 +232,14 @@ function new_object(dict $_GLOBALS, vec $lex, int $i, string $line, string $e) {
     for ($j = 0; $j < count($var_types); $j++) {
         $query .= ", " . (($var_values[$j] === null) ? "null" : $var_values[$j]);
     }
-    if (!mysqli_query($_GLOBALS["CONN"], $query . ")")) return error($_GLOBALS["MYSQL_ERROR"]);
-    return mysqli_fetch_row(mysqli_query($_GLOBALS["CONN"], "SELECT LAST_INSERT_ID()"))[0];
+    if (!mysqli_query($_GLOBALS["conn"], $query . ")")) return error($_GLOBALS["MYSQL_ERROR"]);
+    return mysqli_fetch_row(mysqli_query($_GLOBALS["conn"], "SELECT LAST_INSERT_ID()"))[0];
 }
 
 function assign(dict $_GLOBALS, vec $lex, int $i, string $e, string $line, string $name) {
     if (($val = parse_type($_GLOBALS, $lex, &$i, $line, $e)) === false) return;
     if (!must_end($lex, $i, $line)) return;
-    $_GLOBALS["SYMBOL_TABLE"][$name] = shape("type" => $e, "value" => $val);
+    $_GLOBALS["symbol_table"][$name] = shape("type" => $e, "value" => $val);
 }
 
 function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, string $line) {
@@ -244,13 +247,13 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
         if (!$_GLOBALS["ALL_IDS"]->contains($lex[$i]["type"]))
             return unexpected_token($lex[$i], $line);
         if ($value === null) return carrot_and_error("null pointer exception", $line, $lex[$i - 1]["char_num"]);
-        if (!$_GLOBALS["CLASS_MAP"][$type]->contains($lex[$i]["value"]))
+        if (!$_GLOBALS["class_map"][$type]->contains($lex[$i]["value"]))
             return carrot_and_error($lex[$i]["value"] .
             " does not exist in class " . $type, $line, $lex[$i]["char_num"]);
-        $class_var_type = $_GLOBALS["CLASS_MAP"][$type][$lex[$i]["value"]];
+        $class_var_type = $_GLOBALS["class_map"][$type][$lex[$i]["value"]];
         $is_primitive = $_GLOBALS["PRIM"]->contains($class_var_type);
         $row_name =  $is_primitive ? $lex[$i]["value"] : java_ref_to_mysql($class_var_type, $lex[$i]["value"]); 
-        $result = mysqli_query($_GLOBALS["CONN"], "SELECT " . $row_name . " FROM " . $type . " WHERE _id=" . $value);
+        $result = mysqli_query($_GLOBALS["conn"], "SELECT " . $row_name . " FROM " . $type . " WHERE _id=" . $value);
         if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
         $parent = shape("type" => $type, "value" => $value);
         $value = mysqli_fetch_row($result)[0];
@@ -266,7 +269,7 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     $token = $lex[$i++];
     switch($token["type"]) {
     case TokenType::OBJ_ID:
-        $sym = $_GLOBALS["SYMBOL_TABLE"][$token["value"]];
+        $sym = $_GLOBALS["symbol_table"][$token["value"]];
         if ($lex[$i]["type"] === TokenType::DOT) {
             $i++;
             if (!$d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line)) return false;
@@ -335,14 +338,14 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
 }
 
 function parse_id($_GLOBALS, $token, $line, $e, Set $accept) {
-    if ($accept->contains($e)) return $_GLOBALS["SYMBOL_TABLE"][$token["value"]]["value"];
+    if ($accept->contains($e)) return $_GLOBALS["symbol_table"][$token["value"]]["value"];
     return expected_but_found($_GLOBALS, $token, $line, $e);
 }
 
 function query_result_to_string(dict $_GLOBALS, $result, string $class_name): string {
     $print = vec[];
-    $var_names = $_GLOBALS["CLASS_MAP"][$class_name]->toKeysArray();
-    $var_types = $_GLOBALS["CLASS_MAP"][$class_name]->toValuesArray();
+    $var_names = $_GLOBALS["class_map"][$class_name]->toKeysArray();
+    $var_types = $_GLOBALS["class_map"][$class_name]->toValuesArray();
     while ($row = mysqli_fetch_row($result)) {
         $vars = dict[];
         for ($i = 1; $i < count($row); $i++)
@@ -497,9 +500,9 @@ function lex_line(dict $_GLOBALS, vec $ret, string $line, int $line_num, boolean
             $value = substr($line, $start, $i - $start + 1);
             $type = TokenType::ID;
             if ($_GLOBALS["KEYWORDS"]->containsKey($value)) $type = $_GLOBALS["KEYWORDS"][$value];
-            else if ($_GLOBALS["CLASS_MAP"]->containsKey($value)) $type = TokenType::CLASS_ID;
-            else if ($_GLOBALS["SYMBOL_TABLE"]->containsKey($value)) {
-                $j_type = $_GLOBALS["SYMBOL_TABLE"][$value]["type"];
+            else if ($_GLOBALS["class_map"]->containsKey($value)) $type = TokenType::CLASS_ID;
+            else if ($_GLOBALS["symbol_table"]->containsKey($value)) {
+                $j_type = $_GLOBALS["symbol_table"][$value]["type"];
                 $type = $_GLOBALS["JAVA_TYPE_TO_ID"]->containsKey($j_type) ?
                     $_GLOBALS["JAVA_TYPE_TO_ID"][$j_type] :
                     TokenType::OBJ_ID;
