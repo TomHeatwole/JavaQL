@@ -96,8 +96,19 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
         $rebuild = $lex[$i]["type"] === TokenType::CLASS_ID;
         if (!$lex = lex_file($_GLOBALS, $class_name)) return;
+        $file_vec = $lex["file_vec"];
+        $file_path = $lex["file_path"];
         $lex = $lex["tokens"];
-        // TODO
+        $i = 0;
+        if (!must_match_f($_GLOBALS, $lex, $i, $file_vec, TokenType::CLASS_LITERAL))
+            return found_location($file_path, $lex[$i]["line_num"]);
+        if ($lex[++$i]["value"] !== $class_name) {
+            expected_but_found_literal($lex[$i], $line, $class_name);
+            return found_location($file_path, $lex[$i]["line_num"]);
+        }
+        if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::L_CURLY))
+            return found_location($file_path, $lex[$i]["line_num"]);
+        // TODO: rest of file
         return;
     case TokenType::M_BUILD_ALL:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
@@ -166,7 +177,7 @@ function new_object(dict $_GLOBALS, vec $lex, int $i, string $line, string $e) {
     $class_map = $_GLOBALS["CLASS_MAP"];
     if (!($class_name = must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return false;
     if ($e !== "" && $e !== $class_name)
-        return carrot_and_error("expected " . $e . " but found " . $class_name, $line, $lex[$i]["char_num"]);
+        return expected_but_found_literal($lex[$i], $line, $e);
     if (!must_match($_GLOBALS, $lex, ++$i, $line, TokenType::L_PAREN)) return false;
     $var_types = $class_map[$class_name]->toValuesArray();
     $var_values = vec[];
@@ -325,6 +336,12 @@ function r_paren_semi(dict $_GLOBALS, $lex, int $i, string $line): boolean {
     return (must_match($_GLOBALS, $lex, $i, $line, TokenType::R_PAREN) && must_end($lex, ++$i, $line));
 }
 
+function must_match_f(dict $_GLOBALS, vec $lex, int $i, vec $file_vec, TokenType $e) {
+    if ($lex[$i]["type"] !== $e)
+        return expected_but_found($_GLOBALS, $lex[$i], $file_vec[$lex[$i]["line_num"]], $_GLOBALS["TOKEN_NAME_MAP"][$e]);
+    return $lex[$i]["value"];
+}
+
 // Returns value of matched type on success or false on failure
 function must_match(dict $_GLOBALS, vec $lex, int $i, string $line, TokenType $e) {
     if ($lex[$i]["type"] !== $e)
@@ -340,6 +357,10 @@ function must_match_unexpected(vec $lex, int $i, string $line, TokenType $e) {
 
 function unexpected_token($token, string $line): boolean {
     return carrot_and_error("unexpected token: " . $token["value"], $line, $token["char_num"]);
+}
+
+function expected_but_found_literal($token, string $line, string $e) {
+    return carrot_and_error("expected \"" . $e . "\" but found \"". $token["value"] . "\"", $line, $token["char_num"]);
 }
 
 function expected_but_found(dict $_GLOBALS, $token, string $line, string $e): boolean {
@@ -392,6 +413,11 @@ function error(string $message) {
     return false;
 }
 
+function found_location($file_path, $line_num) {
+    echo "Found at ", $file_path, ":", $line_num, "\n";
+    return false;
+}
+
 function lex_file($_GLOBALS, $class_name) {
     $file_path = $_GLOBALS["CLASSES_DIR"] . $class_name . ".java";
     $class_file = fopen($file_path, "r");
@@ -403,8 +429,7 @@ function lex_file($_GLOBALS, $class_name) {
     $i = 1;
     for (; $line = fgets($class_file); $i++) {
         $line = substr($line, 0, strlen($line) - 1);
-        if (!$lex_result = lex_line($_GLOBALS, $ret, $line, $i, false, $comment))
-            return error("\nFound at " . $file_path . ":" . $i);
+        if (!$lex_result = lex_line($_GLOBALS, $ret, $line, $i, false, $comment)) return found_location($file_path, $i);
         $ret = $lex_result["tokens"];
         $comment = $lex_result["comment"];
         $file_vec[] = $line;
