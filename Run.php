@@ -170,11 +170,47 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         // - Attempt to parse each file using mostly the code from build and queue up queries
         // - write code for rebuild before attempting this
         error("NOT IMPLEMENTED");
-        return;
+        return true;
+    case TokenType::M_RENAME:
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
+        if (!$class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID)) return;
+        $is_class = true;
+        if ($lex[++$i]["type"] === TokenType::DOT) {
+            $is_class = false;
+            if (!$_GLOBALS["ALL_IDS"]->contains($lex[++$i]["type"])) return unexpected_token($lex[$i], $line);
+            $var_name = $lex[$i]["value"];
+            $i++;
+        }
+        if (!must_match_unexpected($lex, $i, $line, TokenType::COMMA)) return;
+        $new_name_type = $lex[++$i]["type"];
+        if (!$_GLOBALS["ALL_IDS"]->contains($new_name_type)) return unexpected_token($lex[$i], $line);
+        if ($is_class && $new_name_type !== TokenType::ID)
+            return carrot_and_error("new class name nust be unique - found "
+                . $_GLOBALS["TOKEN_NAME_MAP"][$new_name_type], $line, $lex[$i]["char_num"]);
+        $new_name = $lex[$i]["value"];
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
+        if ($is_class) return;  // TODO: return rename_class($_GLOBALS, $class_name, $new_name);
+        /* class stuff:
+            // check if there are any differences betweem classes/ and current database. Fail if there are.
+            // TODO: Are you sure?
+            $query = "RENAME TABLE " . $class_name . " TO " . $class_name;
+            if (!mysqli_query($_GLOBALS["conn"], $query)) return error(!$_GLOBALS["MYSQL_ERROR"]);
+            $_GLOBALS["class_map"][$new_name] = $_GLOBALS["class_map"][$class_name];
+            $_GLOBALS["class_map"]->remove($class_name);
+            // - rename in ALL files
+            // - rename ALL over sym table
+            // - rename ALL over class_map
+            // - rename ALL columns of type $class_name
+         */
+        // TODO: Check if there are differences with class file.
+        if (!mysqli_query($_GLOBALS["conn"], "ALTER TABLE " .
+            $class_name . " RENAME COLUMN " . $var_name . " TO " . $new_name));
+        map_replace($_GLOBALS["class_map"][$class_name], $var_name, $new_name);
+        // TODO: Edit file to reflect change?
+        return true;
     case TokenType::NEW_LITERAL:
         if (!new_object($_GLOBALS, $lex, &$i, $line, "")) return false;
         return must_end($lex, $i, $line);
-
     }
     if ($_GLOBALS["JAVA_TYPES"]->containsKey($lex[0]["type"])) {
         $j_type = $_GLOBALS["JAVA_TYPES"][$lex[0]["type"]];
@@ -401,7 +437,7 @@ function get_display_val(dict $_GLOBALS, string $type, $val) {
 }
 
 function r_paren_semi(dict $_GLOBALS, $lex, int $i, string $line): boolean {
-    return (must_match($_GLOBALS, $lex, $i, $line, TokenType::R_PAREN) && must_end($lex, ++$i, $line));
+    return  must_match($_GLOBALS, $lex, $i, $line, TokenType::R_PAREN) && must_end($lex, ++$i, $line);
 }
 
 function must_match_f(dict $_GLOBALS, vec $lex, int $i, vec $file_vec, TokenType $e) {
@@ -491,6 +527,16 @@ function error(string $message) {
 function found_location($file_path, $line_num) {
     echo "Found at ", $file_path, ":", $line_num, "\n";
     return false;
+}
+
+// Doesn't seem like there's a way to dot this better than O(n);
+function map_replace(Map $old_map, string $old_key, string $new_key) {
+    $new_map = new Map();
+    foreach ($old_map->toKeysArray() as $key) {
+        if ($key === $old_key) $new_map[$new_key] = $old_map[$key];
+        $new_map[$key] = $old_map[$key];
+    }
+    return $new_map;
 }
 
 function lex_file($_GLOBALS, $class_name) {
@@ -607,7 +653,7 @@ function lex_line(dict $_GLOBALS, vec $ret, string $line, int $line_num, boolean
         // Comments
         } else if ($line[$i] === "/") {
             if ($i + 1 === strlen($line) || ($line[++$i] !== "/" && $line[$i] !== "*"))
-               carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i); 
+               return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i);
             if ($line[$i] === "/") break; // Rest of line is comment
             $comment = true; // /* comment has begun
 

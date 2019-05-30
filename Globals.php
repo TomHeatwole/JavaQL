@@ -64,6 +64,7 @@ enum TokenType: int {
     M_GET_OBJECTS = 52;
     M_BUILD = 53;
     M_BUILD_ALL = 54;
+    M_RENAME = 55;
 }
 
 $_GLOBALS = dict[
@@ -149,6 +150,7 @@ $_GLOBALS = dict[
         TokenType::M_GET_OBJECTS => "method name",
         TokenType::M_BUILD => "method name",
         TokenType::M_BUILD_ALL => "method name",
+        TokenType::M_RENAME => "method name",
     ]),
     "JAVA_TYPES" => new Map(dict[
         TokenType::CLASS_ID => "class",
@@ -218,6 +220,7 @@ $_GLOBALS = dict[
         "getClass" => TokenType::M_GET_CLASS, 
         "getAllObjects" => TokenType::M_GET_ALL_OBJECTS,
         "getObjects" => TokenType::M_GET_OBJECTS,
+        "rename" => TokenType::M_RENAME,
         "build" => TokenType::M_BUILD,
         "buildAll" => TokenType::M_BUILD_ALL,
         "class" => TokenType::CLASS_LITERAL,
