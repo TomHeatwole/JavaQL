@@ -5,11 +5,11 @@ error_reporting(E_ERROR | E_PARSE);
 include("Globals.php");
 
 $config_file = fopen('database.txt', 'r');
-if (!$config_file) {
+if (!$config_file)
     die($_GLOBALS["PROJECT_NAME"] .
-        " Error: You must include a database.txt file with your MySQL database credentials.\n" .
-        "Refer to the README: " . $_GLOBALS["PROJECT_URL"] . "\n");
-}
+    " Error: you must include a database.txt file with your MySQL database credentials.\n" .
+    "Refer to the README: " . $_GLOBALS["PROJECT_URL"] . "\n");
+
 if (!(($host = fgets($config_file)) && ($username = fgets($config_file))
     && ($password = fgets($config_file)) && $database = fgets($config_file))) {
     die($_GLOBALS["PROJECT_NAME"] . " Error: database.txt must contain 4 lines of your MySQL database credentials.\n"
@@ -22,12 +22,9 @@ echo "Attempting to connect to database...\n";
 $_GLOBALS["conn"] = mysqli_connect(trim($host), trim($username), trim($password), trim($database));
 
 // Check connection
-if (!$_GLOBALS["conn"]) { // In this case the connection attempt gave a warning
-    die($_GLOBALS["PROJECT_NAME"] . "Error: Failed to connect due to warning above.\n");
-}
-if ($_GLOBALS["conn"]->connect_error) {
-    die($_GLOBALS["PROJECT_NAME"] . "Error: Connection failed: " . $_GLOBALS["conn"]->connect_error . "\n");
-}
+if (!$_GLOBALS["conn"]) die($_GLOBALS["PROJECT_NAME"] . "Error: connection failed..\n");
+if ($_GLOBALS["conn"]->connect_error)
+    die($_GLOBALS["PROJECT_NAME"] . "Error: connection failed - " . $_GLOBALS["conn"]->connect_error . "\n");
 echo "Connected successfully\n";
 
 // Load Classes
@@ -56,7 +53,7 @@ $_GLOBALS["class_map"] = new Map($class_map);
 $_GLOBALS["symbol_table"] = new Map();
 
 // Begin CLI 
-while (true) {
+for (;;) {
     $_GLOBALS["query_queue"] = new Vector();
     $_GLOBALS["assign"] = new Map();
     $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
@@ -186,7 +183,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!$_GLOBALS["ALL_IDS"]->contains($new_name_type)) return unexpected_token($lex[$i], $line);
         if ($is_class && $new_name_type !== TokenType::ID)
             return carrot_and_error("new class name nust be unique - found "
-                . $_GLOBALS["TOKEN_NAME_MAP"][$new_name_type], $line, $lex[$i]["char_num"]);
+            . $_GLOBALS["TOKEN_NAME_MAP"][$new_name_type], $line, $lex[$i]["char_num"]);
         $new_name = $lex[$i]["value"];
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
         if ($is_class) return;  // TODO: return rename_class($_GLOBALS, $class_name, $new_name);
@@ -217,10 +214,10 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         $e = ($j_type === "class") ? $lex[0]["value"] : $j_type;
         if ($lex[$i]["type"] === TokenType::CLASS_ID)
             return carrot_and_error($_GLOBALS["PROJECT_NAME"] .
-                " variables may not share names with classes", $line, $lex[$i]["char_num"]);
+            " variables may not share names with classes", $line, $lex[$i]["char_num"]);
         else if ($_GLOBALS["VAR_IDS"]->contains($lex[$i]["type"]))
             return carrot_and_error("variable " . $lex[$i]["value"] .
-                " is already defined", $line, $lex[$i]["char_num"]);
+            " is already defined", $line, $lex[$i]["char_num"]);
         if (!must_match_unexpected($lex, $i, $line, TokenType::ID)) return;
         $name = $lex[$i]["value"];
         if ($end = check_end($lex, ++$i, $line)) {
@@ -363,7 +360,7 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
                 return carrot_and_error("integer value too large", $line, $token["char_num"]);
             if ($int_val > $max || -$int_val > $max + 1)
                 return carrot_and_error("integer value " . $int_val .
-                    " is too large for type " . $e, $line, $token["char_num"]); 
+                " is too large for type " . $e, $line, $token["char_num"]); 
             return $token["value"];
         }
         return expected_but_found($_GLOBALS, $token, $line, $e);
