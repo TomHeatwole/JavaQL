@@ -107,7 +107,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         $sym_table = $_GLOBALS["symbol_table"];
         foreach($sym_table->toKeysArray() as $key)
             $print[$key] = $_GLOBALS["PRIM"]->contains($sym_table[$key]["type"]) ?
-                $sym_table[$key]["value"] :
+                get_display_val_prim($sym_table[$key]["value"]) :
                 get_display_val($_GLOBALS, $sym_table[$key]["type"], $sym_table[$key]["value"]);
         return end_parse(json_encode($print, JSON_PRETTY_PRINT));
     case TokenType::M_GET_ALL_OBJECTS:
@@ -372,7 +372,7 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
             if ($int_val > $max || -$int_val > $max + 1)
                 return carrot_and_error("integer value " . $int_val .
                 " is too large for type " . $e, $line, $token["char_num"]); 
-            return $token["value"];
+            return intval($token["value"]);
         }
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::FLOAT_LITERAL:
@@ -382,9 +382,9 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         if ($e === "float") {
             if ($float_val > $_GLOBALS["FLOAT_MAX"])
                 return carrot_and_error("decimal literal is too large for type float", $line, $token["char_num"]);
-            return $token["value"];
+            return doubleval($token["value"]);
         }
-        if ($e === "double") return $token["value"];
+        if ($e === "double") return doubleval($token["value"]);
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::CHAR_LITERAL:
         if ($e === "char") return $token["value"];
@@ -430,6 +430,10 @@ function query_result_to_string(dict $_GLOBALS, $result, string $class_name): st
         $print[] = $vars;
     }
     return json_encode($print, JSON_PRETTY_PRINT);
+}
+
+function get_display_val_prim($val) {
+    return is_string($val) ? substr($val, 1, count($val) - 2) : $val;
 }
 
 function get_display_val(dict $_GLOBALS, string $type, $val) {
