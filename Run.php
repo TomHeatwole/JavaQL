@@ -88,32 +88,32 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
     $i = 1;
     switch ($lex[0]["type"]) {
     case TokenType::M_GET_CLASSES:
-        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
-        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         return end_parse(json_encode($class_map, JSON_PRETTY_PRINT));
     case TokenType::M_GET_CLASS:
-        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
-        if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return;
-        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
+        if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         return end_parse(json_encode($class_map[$class_name], JSON_PRETTY_PRINT));
     case TokenType::M_GET_CLASS_NAMES:
-        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
-        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         return end_parse(json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT));
     case TokenType::M_GET_ALL_OBJECTS:
-        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
-        if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return;
-        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
+        if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         $result = mysqli_query($_GLOBALS["conn"], "SELECT * FROM " . $class_name);
         return end_parse(query_result_to_string($_GLOBALS, $result, $class_name));
     case TokenType::M_BUILD:
-        if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return;
+        if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
         if ($lex[$i]["type"] !== TokenType::ID && $lex[$i][$type] !== TokenType::CLASS_ID)
             return expected_but_found($_GLOBALS, $lex[$i], $line, "class name");
         $class_name = $lex[$i]["value"];
-        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         $rebuild = $lex[$i]["type"] === TokenType::CLASS_ID;
-        if (!$lex = lex_file($_GLOBALS, $class_name)) return;
+        if (!$lex = lex_file($_GLOBALS, $class_name)) return false;
         $file_vec = $lex["file_vec"];
         $file_path = $lex["file_path"];
         $lex = $lex["tokens"];
@@ -154,13 +154,13 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             if (!mysqli_query($_GLOBALS["conn"], $query . ", PRIMARY KEY(_id))"))
                 return error($_GLOBALS["MYSQL_ERROR"]);
             $_GLOBALS["class_map"][$class_name] = new Map($var_map);
-            return;
+            return true;
         }
         // TODO: Code for rebuild
-        return;
+        return error("rebuild is not implemented");
     case TokenType::M_BUILD_ALL:
-        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
-        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         // TODO: code for build all
         // - Start by asking if we want to delete any existing tables we don't find a .java for
         // - Accumulate list of classes based on what exists (and isn't getting deleted) and what's in the directory
@@ -169,8 +169,8 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         error("NOT IMPLEMENTED");
         return true;
     case TokenType::M_RENAME:
-        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return;
-        if (!$class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID)) return;
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
+        if (!$class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID)) return false;
         $is_class = true;
         if ($lex[++$i]["type"] === TokenType::DOT) {
             $is_class = false;
@@ -178,15 +178,15 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             $var_name = $lex[$i]["value"];
             $i++;
         }
-        if (!must_match_unexpected($lex, $i, $line, TokenType::COMMA)) return;
+        if (!must_match_unexpected($lex, $i, $line, TokenType::COMMA)) return false;
         $new_name_type = $lex[++$i]["type"];
         if (!$_GLOBALS["ALL_IDS"]->contains($new_name_type)) return unexpected_token($lex[$i], $line);
         if ($is_class && $new_name_type !== TokenType::ID)
             return carrot_and_error("new class name nust be unique - found "
             . $_GLOBALS["TOKEN_NAME_MAP"][$new_name_type], $line, $lex[$i]["char_num"]);
         $new_name = $lex[$i]["value"];
-        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return;
-        if ($is_class) return;  // TODO: return rename_class($_GLOBALS, $class_name, $new_name);
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
+        if ($is_class) return false;  // TODO: return rename_class($_GLOBALS, $class_name, $new_name);
         /* class stuff:
             // check if there are any differences betweem classes/ and current database. Fail if there are.
             // TODO: Are you sure?
@@ -218,28 +218,28 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         else if ($_GLOBALS["VAR_IDS"]->contains($lex[$i]["type"]))
             return carrot_and_error("variable " . $lex[$i]["value"] .
             " is already defined", $line, $lex[$i]["char_num"]);
-        if (!must_match_unexpected($lex, $i, $line, TokenType::ID)) return;
+        if (!must_match_unexpected($lex, $i, $line, TokenType::ID)) return false;
         $name = $lex[$i]["value"];
         if ($end = check_end($lex, ++$i, $line)) {
-            if ($end === -1) return;
+            if ($end === -1) return false;
             $_GLOBALS["symbol_table"][$name] = shape("type" => $e, "value" => $_GLOBALS["DEFAULTS"][$j_type]);
-            return;
+            return false;
         }
-        if (!must_match_unexpected($lex, $i, $line, TokenType::ASSIGN)) return;
+        if (!must_match_unexpected($lex, $i, $line, TokenType::ASSIGN)) return false;
         return assign($_GLOBALS, $lex, ++$i, $e, $line, $name);
     }
     if ($_GLOBALS["VAR_IDS"]->contains($lex[0]["type"])) {
         $sym = $_GLOBALS["symbol_table"][$lex[0]["value"]];
         if ($lex[0]["type"] === TokenType::OBJ_ID && $lex[$i]["type"] === TokenType::DOT) {
             $i++;
-            if (!($d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line))) return;
+            if (!($d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line))) return false;
             if ($end = check_end($lex, $i, $line)) {
-                if ($end === -1) return;
+                if ($end === -1) return false;
                 return end_parse(get_display_val($_GLOBALS, $d["type"], $d["value"]));
             }
-            if (!must_match_unexpected($lex, $i++, $line, TokenType::ASSIGN)) return;
-            if (($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"])) === false) return;
-            else if (!must_end($lex, $i, $line)) return;
+            if (!must_match_unexpected($lex, $i++, $line, TokenType::ASSIGN)) return false;
+            if (($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"])) === false) return false;
+            else if (!must_end($lex, $i, $line)) return false;
             $query = "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=";
             if ($set_val instanceof QueryResult) {
                 $query_pieces = vec[$query];
@@ -252,7 +252,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         }
         if ($lex[$i]["type"] === TokenType::ASSIGN)
             return assign($_GLOBALS, $lex, ++$i, $sym["type"], $line, $lex[0]["value"]);
-        if (!must_end($lex, $i, $line)) return;
+        if (!must_end($lex, $i, $line)) return false;
         return end_parse(get_display_val($_GLOBALS, $sym["type"], $sym["value"]));
     }
     return unexpected_token($lex[0], $line);
