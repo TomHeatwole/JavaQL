@@ -100,6 +100,16 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         return end_parse(json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT));
+    case TokenType::M_GET_LOCAL_VARIABLES:
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
+        $print = dict[];
+        $sym_table = $_GLOBALS["symbol_table"];
+        foreach($sym_table->toKeysArray() as $key)
+            $print[$key] = $_GLOBALS["PRIM"]->contains($sym_table[$key]["type"]) ?
+                $sym_table[$key]["value"] :
+                get_display_val($_GLOBALS, $sym_table[$key]["type"], $sym_table[$key]["value"]);
+        return end_parse(json_encode($print, JSON_PRETTY_PRINT));
     case TokenType::M_GET_ALL_OBJECTS:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
@@ -157,6 +167,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             return true;
         }
         // TODO: Code for rebuild
+        // - Prompt user for default value of new columns?
         return error("rebuild is not implemented");
     case TokenType::M_BUILD_ALL:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;

@@ -65,6 +65,9 @@ enum TokenType: int {
     M_BUILD = 53;
     M_BUILD_ALL = 54;
     M_RENAME = 55;
+    M_GET_LOCAL_VARIABLES = 56;
+    M_GET_VARIABLES = 57;
+    M_GET_VARIABLES_RECURSIVE = 58;
 }
 
 $_GLOBALS = dict[
@@ -221,6 +224,9 @@ $_GLOBALS = dict[
         "getAllObjects" => TokenType::M_GET_ALL_OBJECTS,
         "getObjects" => TokenType::M_GET_OBJECTS,
         "rename" => TokenType::M_RENAME,
+        "getLocalVariables" => TokenType::M_GET_LOCAL_VARIABLES,
+        "getVariables" => TokenType::M_GET_VARIABLES,
+        "getVariablesRecursive" => TokenType::M_GET_VARIABLES_RECURSIVE,
         "build" => TokenType::M_BUILD,
         "buildAll" => TokenType::M_BUILD_ALL,
         "class" => TokenType::CLASS_LITERAL,
