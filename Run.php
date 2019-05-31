@@ -90,16 +90,16 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
     case TokenType::M_GET_ALL_DESC:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
-        return end_parse(json_encode($class_map, JSON_PRETTY_PRINT));
+        return success(json_encode($class_map, JSON_PRETTY_PRINT));
     case TokenType::M_GET_DESC:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
-        return end_parse(json_encode($class_map[$class_name], JSON_PRETTY_PRINT));
+        return success(json_encode($class_map[$class_name], JSON_PRETTY_PRINT));
     case TokenType::M_GET_CLASS_NAMES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
-        return end_parse(json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT));
+        return success(json_encode($class_map->toKeysArray(), JSON_PRETTY_PRINT));
     case TokenType::M_GET_LOCAL_VARIABLES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
@@ -109,7 +109,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             $print[$key] = $_GLOBALS["PRIM"]->contains($sym_table[$key]["type"]) ?
                 get_display_val_prim($sym_table[$key]["value"]) :
                 get_display_val($_GLOBALS, $sym_table[$key]["type"], $sym_table[$key]["value"]);
-        return end_parse(json_encode($print, JSON_PRETTY_PRINT));
+        return success(json_encode($print, JSON_PRETTY_PRINT));
     case TokenType::M_GET_VARIABLES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!$_GLOBALS["ALL_IDS"]->contains($lex[++$i]["type"])) return unexpected_token($lex[$i], $line);
@@ -121,13 +121,13 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         $sym = $_GLOBALS["symbol_table"][$name];
         if (!$result = mysqli_query($_GLOBALS["conn"], "SELECT * FROM " . $sym["type"] . " WHERE _ID=" . $sym["value"]))
             return error($_GLOBALS["MYSQL_ERROR"]);
-        return end_parse(query_result_to_string($_GLOBALS, $result, $sym["type"]));
+        return success(query_result_to_string($_GLOBALS, $result, $sym["type"]));
     case TokenType::M_GET_ALL_OBJECTS:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         $result = mysqli_query($_GLOBALS["conn"], "SELECT * FROM " . $class_name);
-        return end_parse(query_result_to_string($_GLOBALS, $result, $class_name));
+        return success(query_result_to_string($_GLOBALS, $result, $class_name));
     case TokenType::M_BUILD:
         if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
         if ($lex[$i]["type"] !== TokenType::ID && $lex[$i][$type] !== TokenType::CLASS_ID)
@@ -189,7 +189,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         // - Accumulate list of classes based on what exists (and isn't getting deleted) and what's in the directory
         // - Attempt to parse each file using mostly the code from build and queue up queries
         // - write code for rebuild before attempting this
-        return end_parse("NOT IMPLEMENTED");
+        return success("NOT IMPLEMENTED");
     case TokenType::M_RENAME:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!$class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID)) return false;
@@ -257,7 +257,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             if (!($d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line))) return false;
             if ($end = check_end($lex, $i, $line)) {
                 if ($end === -1) return false;
-                return end_parse(get_display_val($_GLOBALS, $d["type"], $d["value"]));
+                return success(get_display_val($_GLOBALS, $d["type"], $d["value"]));
             }
             if (!must_match_unexpected($lex, $i++, $line, TokenType::ASSIGN)) return false;
             if (($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"])) === false) return false;
@@ -275,7 +275,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if ($lex[$i]["type"] === TokenType::ASSIGN)
             return assign($_GLOBALS, $lex, ++$i, $sym["type"], $line, $lex[0]["value"]);
         if (!must_end($lex, $i, $line)) return false;
-        return end_parse(get_display_val($_GLOBALS, $sym["type"], $sym["value"]));
+        return success(get_display_val($_GLOBALS, $sym["type"], $sym["value"]));
     }
     return unexpected_token($lex[0], $line);
 }
@@ -296,7 +296,7 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
             echo $class_name, " constructor expects the following parameters: (";
             $var_names = $class_map[$class_name]->toKeysArray();
             for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
-            return end_parse($var_types[count($var_names) - 1] . " " . $var_names[count($var_names) - 1] . ")");
+            return success($var_types[count($var_names) - 1] . " " . $var_names[count($var_names) - 1] . ")");
         }
         if ($j + 1 < count($var_types) && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return;
     }
@@ -532,7 +532,7 @@ function java_ref_to_mysql(string $type, string $name): string {
     return "_" . strlen($type) . $type . $name;
 }
 
-function end_parse($print) {
+function success($print) {
     echo $print, "\n";
     return true;
 }
