@@ -87,11 +87,11 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
     $class_map = $_GLOBALS["class_map"];
     $i = 1;
     switch ($lex[0]["type"]) {
-    case TokenType::M_GET_CLASSES:
+    case TokenType::M_GET_ALL_DESC:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         return end_parse(json_encode($class_map, JSON_PRETTY_PRINT));
-    case TokenType::M_GET_CLASS:
+    case TokenType::M_GET_DESC:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
@@ -110,6 +110,18 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 get_display_val_prim($sym_table[$key]["value"]) :
                 get_display_val($_GLOBALS, $sym_table[$key]["type"], $sym_table[$key]["value"]);
         return end_parse(json_encode($print, JSON_PRETTY_PRINT));
+    case TokenType::M_GET_VARIABLES:
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
+        if (!$_GLOBALS["ALL_IDS"]->contains($lex[++$i]["type"])) return unexpected_token($lex[$i], $line);
+        if ($lex[$i]["type"] !== TokenType::OBJ_ID)
+            return carrot_and_error("getVariables() expects an Object - found "
+            . $_GLOBALS["TOKEN_NAME_MAP"][$lex[$i]["type"]], $line, $lex[$i]["char_num"]);
+        $name = $lex[$i]["value"];
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
+        $sym = $_GLOBALS["symbol_table"][$name];
+        if (!$result = mysqli_query($_GLOBALS["conn"], "SELECT * FROM " . $sym["type"] . " WHERE _ID=" . $sym["value"]))
+            return error($_GLOBALS["MYSQL_ERROR"]);
+        return end_parse(query_result_to_string($_GLOBALS, $result, $sym["type"]));
     case TokenType::M_GET_ALL_OBJECTS:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
@@ -177,8 +189,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         // - Accumulate list of classes based on what exists (and isn't getting deleted) and what's in the directory
         // - Attempt to parse each file using mostly the code from build and queue up queries
         // - write code for rebuild before attempting this
-        error("NOT IMPLEMENTED");
-        return true;
+        return end_parse("NOT IMPLEMENTED");
     case TokenType::M_RENAME:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!$class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID)) return false;
@@ -523,7 +534,7 @@ function java_ref_to_mysql(string $type, string $name): string {
 
 function end_parse($print) {
     echo $print, "\n";
-    return false;
+    return true;
 }
 
 function carrot_and_error(string $message, string $line, int $index) {
