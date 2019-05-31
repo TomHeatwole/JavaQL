@@ -352,6 +352,12 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
 // return value if parsed correctly or false otherwise
 function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) {
     // TODO: Implement default
+    //
+    // TODO: Allow this method to be called without $e like in new
+    // Make 2 separate switch statements
+    // - First is for parse items where we can definitely deduce the return type
+    // - ex. new and IDs
+    // - throw unexpected token error after first loop if $e is ""      
     $token = $lex[$i++];
     switch($token["type"]) {
     case TokenType::NEW_LITERAL:
@@ -378,7 +384,7 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         if ($_GLOBALS["INT_MAX"]->containsKey($e)) {
             $max = $_GLOBALS["INT_MAX"][$e];
             // TODO: Figure out how to check for longs on a 32 bit machine
-            if ("" . $int_val !== $token["value"])
+            if ("" . $int_val !== int_trim_zeros($token["value"])) 
                 return carrot_and_error("integer value too large", $line, $token["char_num"]);
             if ($int_val > $max || -$int_val > $max + 1)
                 return carrot_and_error("integer value " . $int_val .
@@ -728,3 +734,9 @@ function lex_number(string $line, int &$i, bool $decimal) {
     );
 }
 
+function int_trim_zeros(string $val) {
+    $i = 0;
+    for (; $i < strlen($val) - 1; $i++)
+        if ($val[$i] !== "0") break;
+    return substr($val, $i);
+}
