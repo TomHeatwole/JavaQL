@@ -319,9 +319,9 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     return new QueryResult(count($_GLOBALS["query_queue"]) - 1);
 }
 
-function assign(dict $_GLOBALS, vec $lex, int $i, string $e, string $line, string $name) {
-    if (($val = parse_type($_GLOBALS, $lex, &$i, $line, $e)) === false) return;
-    if (!must_end($lex, $i, $line)) return;
+function assign(dict $_GLOBALS, vec $lex, int $i, string $e, string $line, string $name): boolean {
+    if (($val = parse_type($_GLOBALS, $lex, &$i, $line, $e)) === false) return false;
+    if (!must_end($lex, $i, $line)) return false;
     if ($val instanceof QueryResult) {
         $_GLOBALS["assign"]["name"] = $name;
         $_GLOBALS["assign"]["q_num"] = $val->q_num;
@@ -452,7 +452,7 @@ function query_result_to_string(dict $_GLOBALS, $result, string $class_name): st
     return json_encode($print, JSON_PRETTY_PRINT);
 }
 
-function get_display_val_prim($val) {
+function get_display_val_prim($val): string {
     return is_string($val) ? substr($val, 1, count($val) - 2) : $val;
 }
 
@@ -469,7 +469,7 @@ function get_display_val(dict $_GLOBALS, string $type, $val) {
 }
 
 function r_paren_semi(dict $_GLOBALS, $lex, int $i, string $line): boolean {
-    return  must_match($_GLOBALS, $lex, $i, $line, TokenType::R_PAREN) && must_end($lex, ++$i, $line);
+    return must_match($_GLOBALS, $lex, $i, $line, TokenType::R_PAREN) && must_end($lex, ++$i, $line);
 }
 
 function must_match_f(dict $_GLOBALS, vec $lex, int $i, vec $file_vec, TokenType $e) {
@@ -496,7 +496,7 @@ function unexpected_token($token, string $line): boolean {
     return carrot_and_error("unexpected token: " . $token["value"], $line, $token["char_num"]);
 }
 
-function expected_but_found_literal($token, string $line, string $e) {
+function expected_but_found_literal($token, string $line, string $e): boolean {
     return carrot_and_error("expected \"" . $e . "\" but found \"". $token["value"] . "\"", $line, $token["char_num"]);
 }
 
@@ -522,7 +522,7 @@ function check_end(vec $lex, int $i, string $line): int {
     return 0;
 }
 
-function get_column(dict $_GLOBALS, string $type, string $name) {
+function get_column(dict $_GLOBALS, string $type, string $name): shape("type" => string, "name" => string) {
     return $_GLOBALS["PRIM"]->contains($type)
         ? shape("type" => $_GLOBALS["TO_SQL_TYPE_MAP"][$type], "name" => $name)
         : shape("type" => "int", "name" => java_ref_to_mysql($type, $name));
@@ -541,28 +541,28 @@ function java_ref_to_mysql(string $type, string $name): string {
     return "_" . strlen($type) . $type . $name;
 }
 
-function success($print) {
+function success($print): boolean {
     echo $print, "\n";
     return true;
 }
 
-function carrot_and_error(string $message, string $line, int $index) {
+function carrot_and_error(string $message, string $line, int $index): boolean {
     echo $line, "\n", str_repeat(" ", $index), "^\n";
     return error($message);
 }
 
-function error(string $message) {
+function error(string $message): boolean {
     echo "Error: ", $message, "\n";
     return false;
 }
 
-function found_location($file_path, $line_num) {
+function found_location($file_path, $line_num): boolean {
     echo "Found at ", $file_path, ":", $line_num, "\n";
     return false;
 }
 
 // Doesn't seem like there's a way to dot this better than O(n);
-function map_replace(Map $old_map, string $old_key, string $new_key) {
+function map_replace(Map $old_map, string $old_key, string $new_key): Map {
     $new_map = new Map();
     foreach ($old_map->toKeysArray() as $key) {
         if ($key === $old_key) $new_map[$new_key] = $old_map[$key];
@@ -748,7 +748,7 @@ function lex_number(string $line, int &$i, bool $decimal) {
     );
 }
 
-function int_trim_zeros(string $val) {
+function int_trim_zeros(string $val): string {
     $i = 0;
     for (; $i < strlen($val) - 1; $i++)
         if ($val[$i] !== "0") break;
