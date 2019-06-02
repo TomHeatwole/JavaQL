@@ -175,6 +175,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             }
             if (!mysqli_query($_GLOBALS["conn"], $query . ", PRIMARY KEY(_id))"))
                 return error($_GLOBALS["MYSQL_ERROR"]);
+            
             $_GLOBALS["class_map"][$class_name] = new Map($var_map);
             return true;
         }
@@ -224,7 +225,9 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         // TODO: Check if there are differences with class file.
         if (!mysqli_query($_GLOBALS["conn"], "ALTER TABLE " .
             $class_name . " RENAME COLUMN " . $var_name . " TO " . $new_name));
-        map_replace($_GLOBALS["class_map"][$class_name], $var_name, $new_name);
+        $_GLOBALS["class_map"][$class_name] = map_replace($_GLOBALS["class_map"][$class_name], $var_name, $new_name);
+        var_dump($_GLOBALS["class_map"][$class_name]);
+
         // TODO: Edit file to reflect change?
         return true;
     case TokenType::NEW_LITERAL:
@@ -563,10 +566,21 @@ function map_replace(Map $old_map, string $old_key, string $new_key) {
     $new_map = new Map();
     foreach ($old_map->toKeysArray() as $key) {
         if ($key === $old_key) $new_map[$new_key] = $old_map[$key];
+        else $new_map[$key] = $old_map[$key];
+    }
+    return $new_map;
+}
+
+/* TODO
+function map_add_alphabetical(Map $old_map, string $new_key, $new_value) {
+    $new_map = new Map();
+    foreach ($old_map->toKeysArray() as $key) {
+        if ($key > $new_key) $new_map[$new_key] = $new_value;
         $new_map[$key] = $old_map[$key];
     }
     return $new_map;
 }
+ */
 
 function lex_file($_GLOBALS, $class_name) {
     $file_path = $_GLOBALS["CLASSES_DIR"] . $class_name . ".java";
