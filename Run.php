@@ -226,7 +226,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!mysqli_query($_GLOBALS["conn"], "ALTER TABLE " .
             $class_name . " RENAME COLUMN " . $var_name . " TO " . $new_name));
         $_GLOBALS["class_map"][$class_name] = map_replace($_GLOBALS["class_map"][$class_name], $var_name, $new_name);
-        var_dump($_GLOBALS["class_map"][$class_name]);
+        // var_dump($_GLOBALS["class_map"][$class_name]);
 
         // TODO: Edit file to reflect change?
         return true;
@@ -263,7 +263,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 return success(get_display_val($_GLOBALS, $d["type"], $d["value"]));
             }
             if (!must_match_unexpected($lex, $i++, $line, TokenType::ASSIGN)) return false;
-            if (($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"])) === false) return false;
+            if (($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"])["value"]) === false) return false;
             else if (!must_end($lex, $i, $line)) return false;
             $query = "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=";
             if ($set_val instanceof QueryResult) {
@@ -295,7 +295,7 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     $i++;
     for ($j = 0; $j < count($var_types); $j++) {
         // === false to check for "0"
-        if (($var_values[] = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j])) === false) {
+        if (($var_values[] = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j])["value"]) === false) {
             echo $class_name, " constructor expects the following parameters: (";
             $var_names = $class_map[$class_name]->toKeysArray();
             for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
@@ -303,7 +303,9 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         }
         if ($j + 1 < count($var_types) && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return;
     }
-    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) {
+        return false;
+    }
     $query_pieces = vec[];
     $query = "INSERT INTO " . $class_name . " VALUES (default";
     for ($j = 0; $j < count($var_types); $j++) {
@@ -316,11 +318,13 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     $query_pieces[] = $query . ")";
     $_GLOBALS["query_queue"][] = $query_pieces;
     $_GLOBALS["query_queue"][] = vec["SELECT LAST_INSERT_ID()"];
-    return new QueryResult(count($_GLOBALS["query_queue"]) - 1);
+    $qr = new QueryResult(count($_GLOBALS["query_queue"]) - 1);
+    return shape("value" => $qr, "type" => $class_name);
 }
 
 function assign(dict $_GLOBALS, vec $lex, int $i, string $e, string $line, string $name): boolean {
     if (($val = parse_type($_GLOBALS, $lex, &$i, $line, $e)) === false) return false;
+    $val = $val["value"];
     if (!must_end($lex, $i, $line)) return false;
     if ($val instanceof QueryResult) {
         $_GLOBALS["assign"]["name"] = $name;
@@ -364,7 +368,7 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     $token = $lex[$i++];
     switch($token["type"]) {
     case TokenType::NEW_LITERAL:
-        return ($value = new_object($_GLOBALS, $lex, &$i, $line, $e)) ? $value : false;
+        return ($val = new_object($_GLOBALS, $lex, &$i, $line, $e)) ? $val : false;
     case TokenType::OBJ_ID:
         $sym = $_GLOBALS["symbol_table"][$token["value"]];
         if ($lex[$i]["type"] === TokenType::DOT) {
@@ -373,50 +377,7 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
             return $d["value"];
         }
         if ($sym["type"] !== $e) return expected_but_found($_GLOBALS, $token, $line, $e);
-        return $sym["value"];
-    case TokenType::INT_LITERAL:
-        $int_val = (int)$token["value"];
-        if ($e === "float") {
-            if ($int_val <= $_GLOBALS["FLOAT_MAX"]) return $token["value"];
-            return carrot_and_error("int literal is too large for type float", $line, $token["char_num"]);
-        }
-        if ($e === "double") {
-            if ((double)$token["value"] !== INF) return $token["value"];
-            return carrot_and_error("int literal is too large for type double", $line, $token["char_num"]);
-        }
-        if ($_GLOBALS["INT_MAX"]->containsKey($e)) {
-            $max = $_GLOBALS["INT_MAX"][$e];
-            // TODO: Figure out how to check for longs on a 32 bit machine
-            if ("" . $int_val !== int_trim_zeros($token["value"])) 
-                return carrot_and_error("integer value too large", $line, $token["char_num"]);
-            if ($int_val > $max || -$int_val > $max + 1)
-                return carrot_and_error("integer value " . $int_val .
-                " is too large for type " . $e, $line, $token["char_num"]); 
-            return intval($token["value"]);
-        }
-        return expected_but_found($_GLOBALS, $token, $line, $e);
-    case TokenType::FLOAT_LITERAL:
-        $float_val = (double)$token["value"];
-        if ($float_val === INF)
-            return carrot_and_error("decimal literal is too large", $line, $token["char_num"]);
-        if ($e === "float") {
-            if ($float_val > $_GLOBALS["FLOAT_MAX"])
-                return carrot_and_error("decimal literal is too large for type float", $line, $token["char_num"]);
-            return doubleval($token["value"]);
-        }
-        if ($e === "double") return doubleval($token["value"]);
-        return expected_but_found($_GLOBALS, $token, $line, $e);
-    case TokenType::CHAR_LITERAL:
-        if ($e === "char") return $token["value"];
-        return expected_but_found($_GLOBALS, $token, $line, $e);
-    case TokenType::STRING_LITERAL:
-        if ($e === "String") return $token["value"];
-        return expected_but_found($_GLOBALS, $token, $line, $e);
-    case TokenType::BOOLEAN_LITERAL:
-        if ($e === "boolean") return $token["value"];
-        return expected_but_found($_GLOBALS, $token, $line, $e);
-    case TokenType::NULL_LITERAL:
-        return $_GLOBALS["PRIM"]->contains($e) ? expected_but_found($_GLOBALS, $token, $line, $e) : null;
+        return $sym;
     case TokenType::BOOLEAN_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["boolean"]));
     case TokenType::CHAR_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["char", "String"]));
     case TokenType::STRING_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["String"]));
@@ -430,12 +391,66 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["int", "long", "float", "double"]));
     case TokenType::LONG_ID:
         return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["long", "float", "double"]));
+    }
+    if ($e === "") return unexpected_token($token, $line);
+    switch($token["type"]) {
+    case TokenType::INT_LITERAL:
+        $int_val = (int)$token["value"];
+        if ($e === "float") {
+            if ($int_val <= $_GLOBALS["FLOAT_MAX"]) return shape("value" => $token["value"], "type" => $e);
+            return carrot_and_error("int literal is too large for type float", $line, $token["char_num"]);
+        }
+        if ($e === "double") {
+            if ((double)$token["value"] !== INF) return shape("value" => $token["value"], "type" => $e);
+            return carrot_and_error("int literal is too large for type double", $line, $token["char_num"]);
+        }
+        if ($_GLOBALS["INT_MAX"]->containsKey($e)) {
+            $max = $_GLOBALS["INT_MAX"][$e];
+            // TODO: Figure out how to check for longs on a 32 bit machine
+            if ("" . $int_val !== int_trim_zeros($token["value"])) 
+                return carrot_and_error("integer value too large", $line, $token["char_num"]);
+            if ($int_val > $max || -$int_val > $max + 1)
+                return carrot_and_error("integer value " . $int_val .
+                " is too large for type " . $e, $line, $token["char_num"]); 
+            return shape("value" => intval($token["value"]), "type" => $e);
+        }
+        return expected_but_found($_GLOBALS, $token, $line, $e);
+    case TokenType::FLOAT_LITERAL:
+        $float_val = (double)$token["value"];
+        if ($float_val === INF)
+            return carrot_and_error("decimal literal is too large", $line, $token["char_num"]);
+        if ($e === "float") {
+            if ($float_val > $_GLOBALS["FLOAT_MAX"])
+                return carrot_and_error("decimal literal is too large for type float", $line, $token["char_num"]);
+            return shape("value" => doubleval($token["value"]), "type" => $e);
+        }
+        if ($e === "double") return doubleval($token["value"]);
+        return expected_but_found($_GLOBALS, $token, $line, $e);
+    case TokenType::CHAR_LITERAL:
+        if ($e === "char") return shape("value" => $token["value"], "type" => $e);
+        return expected_but_found($_GLOBALS, $token, $line, $e);
+    case TokenType::STRING_LITERAL:
+        if ($e === "String") return shape("value" => $token["value"], "type" => $e);
+        return expected_but_found($_GLOBALS, $token, $line, $e);
+    case TokenType::BOOLEAN_LITERAL:
+        if ($e === "boolean") return shape("value" => $token["value"], "type" => $e);
+        return expected_but_found($_GLOBALS, $token, $line, $e);
+    case TokenType::NULL_LITERAL:
+        return $_GLOBALS["PRIM"]->contains($e)
+            ? expected_but_found($_GLOBALS, $token, $line, $e)
+            : shape("value" => null, "type" => $e);
     default: return expected_but_found($_GLOBALS, $token, $line, $e);
     }
 }
 
 function parse_id($_GLOBALS, $token, $line, $e, Set $accept) {
-    if ($accept->contains($e)) return $_GLOBALS["symbol_table"][$token["value"]]["value"];
+    if ($e === "") {
+        return $_GLOBALS["symbol_table"][$token["value"]];
+    }
+    if ($accept->contains($e)) return shape(
+        "value" => $_GLOBALS["symbol_table"][$token["value"]]["value"],
+        "type" => $e,
+    );
     return expected_but_found($_GLOBALS, $token, $line, $e);
 }
 
