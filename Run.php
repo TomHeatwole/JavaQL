@@ -299,7 +299,7 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
             echo $class_name, " constructor expects the following parameters: (";
             $var_names = $class_map[$class_name]->toKeysArray();
             for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
-            return success($var_types[count($var_names) - 1] . " " . $var_names[count($var_names) - 1] . ")");
+            return fail($var_types[count($var_names) - 1] . " " . $var_names[count($var_names) - 1] . ")");
         }
         if ($j + 1 < count($var_types) && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return;
     }
@@ -546,14 +546,18 @@ function success($print): boolean {
     return true;
 }
 
+function fail(string $print): boolean {
+    echo $print, "\n";
+    return false;
+}
+
 function carrot_and_error(string $message, string $line, int $index): boolean {
     echo $line, "\n", str_repeat(" ", $index), "^\n";
     return error($message);
 }
 
 function error(string $message): boolean {
-    echo "Error: ", $message, "\n";
-    return false;
+    return fail("Error: " . $message);
 }
 
 function found_location($file_path, $line_num): boolean {
