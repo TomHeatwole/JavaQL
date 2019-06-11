@@ -56,6 +56,7 @@ $_GLOBALS["symbol_table"] = new Map();
 for (;;) {
     $_GLOBALS["query_queue"] = new Vector();
     $_GLOBALS["assign"] = new Map();
+    $_GLOBALS["print_qr"] = new Map();
     $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
     if ($line === "q" || $line === "quit") break;
     if (!$lex = lex_line($_GLOBALS, vec[], $line, 0, true, false)) continue;
@@ -75,11 +76,14 @@ for (;;) {
     }
     if ($quit) continue;
     $assign = $_GLOBALS["assign"];
-    if (count($assign) === 0) continue;
-    $_GLOBALS["symbol_table"][$assign["name"]] = shape(
-        "type" => $assign["type"],
-        "value" => mysqli_fetch_row($query_results[$assign["q_num"]])[0],
-    );
+    if (count($assign) > 0)
+        $_GLOBALS["symbol_table"][$assign["name"]] = shape(
+            "type" => $assign["type"],
+            "value" => mysqli_fetch_row($query_results[$assign["q_num"]])[0],
+        );
+    $print_qr = $_GLOBALS["print_qr"];
+    if (count($print_qr) > 0)
+        success(query_result_to_string($_GLOBALS, $query_results[$print_qr["qr_num"]], $print_qr["class_name"]));
 }
 
 function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
@@ -112,16 +116,26 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         return success(json_encode($print, JSON_PRETTY_PRINT));
     case TokenType::M_GET_VARIABLES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
-        if (!$_GLOBALS["ALL_IDS"]->contains($lex[++$i]["type"])) return unexpected_token($lex[$i], $line);
-        if ($lex[$i]["type"] !== TokenType::OBJ_ID)
-            return carrot_and_error("getVariables() expects an Object - found "
-            . $_GLOBALS["TOKEN_NAME_MAP"][$lex[$i]["type"]], $line, $lex[$i]["char_num"]);
-        $name = $lex[$i]["value"];
-        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
-        $sym = $_GLOBALS["symbol_table"][$name];
-        if (!$result = mysqli_query($_GLOBALS["conn"], "SELECT * FROM " . $sym["type"] . " WHERE _ID=" . $sym["value"]))
+        $i++;
+        if (!$param = parse_type($_GLOBALS, $lex, &$i, $line, "")) return false;
+        if ($param["value"] === null)
+            return carrot_and_error("getVariables() expects non-null parameter", $line, $lex[$i - 1]["char_num"]);
+        if ($_GLOBALS["PRIM"]->contains($param["type"]))
+            return carrot_and_error("getVariables() expects non-primitive parameter", $line, $lex[$i - 1]["char_num"]);
+        if (!r_paren_semi($_GLOBALS, $lex, $i, $line)) return false;
+        $query = "SELECT * FROM " . $param["type"] . " WHERE _ID=";
+        if ($param["value"] instanceof QueryResult) {
+            $query_pieces = vec[$query];
+            $query_pieces[] = $param["value"]->q_num;
+            $_GLOBALS["query_queue"][] = $query_pieces;
+            $_GLOBALS["print_qr"]["qr_num"] = count($_GLOBALS["query_queue"]) - 1;
+            $_GLOBALS["print_qr"]["class_name"] = $param["type"];
+            return true;
+        }
+        if (!$result = mysqli_query($_GLOBALS["conn"], "SELECT * FROM "
+            . $param["type"] . " WHERE _ID=" . $param["value"]))
             return error($_GLOBALS["MYSQL_ERROR"]);
-        return success(query_result_to_string($_GLOBALS, $result, $sym["type"]));
+        return success(query_result_to_string($_GLOBALS, $result, $param["type"]));
     case TokenType::M_GET_ALL_OBJECTS:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
@@ -359,12 +373,6 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
 // return value if parsed correctly or false otherwise
 function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) {
     // TODO: Implement default
-    //
-    // TODO: Allow this method to be called without $e like in new
-    // Make 2 separate switch statements
-    // - First is for parse items where we can definitely deduce the return type
-    // - ex. new and IDs
-    // - throw unexpected token error after first loop if $e is ""      
     $token = $lex[$i++];
     switch($token["type"]) {
     case TokenType::NEW_LITERAL:
@@ -373,11 +381,10 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         $sym = $_GLOBALS["symbol_table"][$token["value"]];
         if ($lex[$i]["type"] === TokenType::DOT) {
             $i++;
-            if (!$d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line)) return false;
-            return $d["value"];
+            if (!$sym = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line)) return false;
         }
-        if ($sym["type"] !== $e) return expected_but_found($_GLOBALS, $token, $line, $e);
-        return $sym;
+        if ($sym["type"] === $e || $e === "") return $sym;
+        return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::BOOLEAN_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["boolean"]));
     case TokenType::CHAR_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["char", "String"]));
     case TokenType::STRING_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["String"]));
@@ -393,6 +400,7 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["long", "float", "double"]));
     }
     if ($e === "") return unexpected_token($token, $line);
+    // TODO: could we move some or all literals to the above switch?
     switch($token["type"]) {
     case TokenType::INT_LITERAL:
         $int_val = (int)$token["value"];
