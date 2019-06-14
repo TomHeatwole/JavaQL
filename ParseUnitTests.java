@@ -81,6 +81,7 @@ public class ParseUnitTests {
             }
         }
         if (st != State.NEW_TEST && st != State.OUTPUT) return parseError("Unexpected end of file", lineNum);
+        inputs.println("quit");
         return true;
     }
     
