@@ -1,0 +1,18 @@
+#!/bin/bash
+hhvm PrintUnitTestBarrier.php > unit_test_barrier.txt
+javac ParseUnitTests.java #TODO: Remove this line when PraseUnitTests is finished
+java ParseUnitTests
+exit_code=$?
+if [ $exit_code == 1 ]
+then
+    rm unit_test_barrier.txt
+    rm test_expected_outputs.txt
+    rm test_names.txt
+    rm test_inputs.txt
+    exit 0
+fi
+echo "Running tests..."
+./t < test_inputs.txt > test_outputs.txt
+
+echo "Done. Evaluating results..."
+
