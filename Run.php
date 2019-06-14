@@ -91,6 +91,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
     $class_map = $_GLOBALS["class_map"];
     $i = 1;
     switch ($lex[0]["type"]) {
+    case TokenType::EOL: return false;
     case TokenType::M_GET_ALL_DESC:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
@@ -247,6 +248,8 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
     case TokenType::NEW_LITERAL:
         if (!new_object($_GLOBALS, $lex, &$i, $line, "")) return false;
         return must_end($lex, $i, $line);
+    case TokenType::ID:
+        if ($lex[0]["value"] == $_GLOBALS["UNIT_TEST"]) return success($_GLOBALS["UNIT_TEST"]);
     }
     if ($_GLOBALS["JAVA_TYPES"]->containsKey($lex[0]["type"])) {
         $j_type = $_GLOBALS["JAVA_TYPES"][$lex[0]["type"]];

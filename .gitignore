@@ -6,6 +6,9 @@ MakeEnum.java
 Test.java
 Test.class
 Enum*
-test_input.txt
+test_inputs.txt
+test_outputs.txt
+test_expected_outputs.txt
 classes/
 a.out
+State.class

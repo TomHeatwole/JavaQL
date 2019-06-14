@@ -1,0 +1,16 @@
+NAME
+lex error
+INPUT
+lol
+OUTPUT
+lol
+   ^
+Error: unexpected token: end of line
+
+NAME
+example test
+INPUT
+remfhaha t = new remfhaha(false, "haha", 46);
+t.haha
+OUTPUT
+false

@@ -75,6 +75,7 @@ $_GLOBALS = dict[
     "PROJECT_URL" => "https://github.com/TomHeatwole/JavaQL/",
     "CLASSES_DIR" => "classes/",
     "MYSQL_ERROR" => "an unknown MySQL error occurred",
+    "UNIT_TEST" => "qd082j3tn0g88an94uq103333333qt8aas",
     "FROM_SQL_TYPE_MAP" => dict[
         "varchar(255)" => "String",
         "tinyint(4)" => "byte",
