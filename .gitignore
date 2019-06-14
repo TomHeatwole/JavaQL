@@ -9,6 +9,7 @@ Enum*
 test_inputs.txt
 test_outputs.txt
 test_expected_outputs.txt
+unit_test_barrier.txt
 classes/
 a.out
 State.class

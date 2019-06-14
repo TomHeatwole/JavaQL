@@ -249,6 +249,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!new_object($_GLOBALS, $lex, &$i, $line, "")) return false;
         return must_end($lex, $i, $line);
     case TokenType::ID:
+        // This line must exist for unit tests to run correctly
         if ($lex[0]["value"] == $_GLOBALS["UNIT_TEST"]) return success($_GLOBALS["UNIT_TEST"]);
     }
     if ($_GLOBALS["JAVA_TYPES"]->containsKey($lex[0]["type"])) {

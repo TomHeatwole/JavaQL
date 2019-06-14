@@ -14,6 +14,8 @@ public class ParseUnitTests {
     final static String testCasesFile = "unit_tests.txt";
     final static String inputsFile = "test_inputs.txt";
     final static String outputsFile = "test_expected_outputs.txt";
+    final static String unitTestBarrierFile = "unit_test_barrier.txt";
+    static String barrier;
 
     public static void main (String[] args) {
         Scanner in;
@@ -23,6 +25,9 @@ public class ParseUnitTests {
             in = new Scanner(new File(testCasesFile));
             inputs = new PrintStream(new File(inputsFile));
             outputs = new PrintStream(new File(outputsFile));
+            Scanner b = new Scanner(new File(unitTestBarrierFile));
+            barrier = b.nextLine();
+            b.close();
         } catch (Exception e) {
             e.printStackTrace();
             return;
