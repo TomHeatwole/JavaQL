@@ -25,15 +25,15 @@ public class ParseUnitTests {
         PrintStream names = null;
         try {
             in = new Scanner(new File(testCasesFile));
+            Scanner b = new Scanner(new File(unitTestBarrierFile));
             inputs = new PrintStream(new File(inputsFile));
             outputs = new PrintStream(new File(outputsFile));
             names = new PrintStream(new File(namesFile));
-            Scanner b = new Scanner(new File(unitTestBarrierFile));
             barrier = b.nextLine();
             b.close();
         } catch (Exception e) {
-            e.printStackTrace();
-            System.exit(1);
+            System.err.println("Error: no unit_tests.txt file found");
+            System.exit(2);
         }
         boolean success = parseTests(in, inputs, outputs, names);
         in.close();
