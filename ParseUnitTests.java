@@ -14,39 +14,45 @@ public class ParseUnitTests {
     final static String testCasesFile = "unit_tests.txt";
     final static String inputsFile = "test_inputs.txt";
     final static String outputsFile = "test_expected_outputs.txt";
+    final static String namesFile = "test_names.txt";
     final static String unitTestBarrierFile = "unit_test_barrier.txt";
     static String barrier;
 
     public static void main (String[] args) {
-        Scanner in;
-        PrintStream inputs;
-        PrintStream outputs;
+        Scanner in = null;
+        PrintStream inputs = null;
+        PrintStream outputs = null;
+        PrintStream names = null;
         try {
             in = new Scanner(new File(testCasesFile));
             inputs = new PrintStream(new File(inputsFile));
             outputs = new PrintStream(new File(outputsFile));
+            names = new PrintStream(new File(namesFile));
             Scanner b = new Scanner(new File(unitTestBarrierFile));
             barrier = b.nextLine();
             b.close();
         } catch (Exception e) {
             e.printStackTrace();
-            return;
+            System.exit(1);
         }
-        boolean success = parseTests(in, inputs, outputs);
+        boolean success = parseTests(in, inputs, outputs, names);
         in.close();
         if (!success) System.exit(1);
     }
 
-    public static boolean parseTests(Scanner in, PrintStream inputs, PrintStream outputs) {
+    public static boolean parseTests(Scanner in, PrintStream inputs, PrintStream outputs, PrintStream names) {
         int testNum = 0;
         State st = State.NEW_TEST;
-        String name = "";
+        boolean nameFound = false;
         int lineNum = 1;
         for (; in.hasNextLine(); lineNum++) {
             String line = in.nextLine();
-            if (line == "") {
+            if (line.equals("")) {
                 if (st == State.OUTPUT) {
-                    // TODO: new test code
+                    inputs.println(barrier);
+                    outputs.println(barrier);
+                    nameFound = false;
+                    st = State.NEW_TEST;
                     continue;
                 }
                 return parseError("unexpected empty line", lineNum);
@@ -57,8 +63,9 @@ public class ParseUnitTests {
                     else return parseError("expected beginning of new test", lineNum);
                     break;
                 case NAME:
-                    if (name.equals("")) {
-                        name = line;
+                    if (!nameFound) {
+                        nameFound = true;
+                        names.println(line); 
                         break;
                     }
                     if (line.equals("INPUT")) st = State.INPUT;
@@ -82,3 +89,4 @@ public class ParseUnitTests {
         return false;
     }
 }
+
