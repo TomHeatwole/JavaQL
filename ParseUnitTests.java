@@ -41,7 +41,6 @@ public class ParseUnitTests {
     }
 
     public static boolean parseTests(Scanner in, PrintStream inputs, PrintStream outputs, PrintStream names) {
-        int testNum = 0;
         State st = State.NEW_TEST;
         boolean nameFound = false;
         int lineNum = 1;
@@ -81,6 +80,10 @@ public class ParseUnitTests {
             }
         }
         if (st != State.NEW_TEST && st != State.OUTPUT) return parseError("Unexpected end of file", lineNum);
+        if (st == State.OUTPUT) {
+            outputs.println(barrier);
+            inputs.println(barrier);
+        }
         inputs.println("quit");
         return true;
     }

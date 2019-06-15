@@ -14,3 +14,4 @@ remfhaha t = new remfhaha(false, "haha", 46);
 t.haha
 OUTPUT
 false
+
