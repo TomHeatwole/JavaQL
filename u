@@ -2,7 +2,7 @@
 
 hhvm PrintUnitTestBarrier.php > unit_test_barrier.txt
 
-javac ParseUnitTests.java
+javac ParseUnitTests.java #TODO: Remove this line when java files are finished
 java ParseUnitTests
 exit_code=$?
 if [ $exit_code == 2 ]
@@ -22,7 +22,7 @@ echo "Running tests..."
 ./t < test_inputs.txt > test_outputs.txt
 echo "Done. Evaluating results..."
 
-javac EvaluateUnitTests.java #TODO: Remove this line when PraseUnitTests is finished
+javac EvaluateUnitTests.java #TODO: Remove this line when java files are finished
 java EvaluateUnitTests
 
 rm unit_test_barrier.txt

@@ -143,6 +143,14 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         $result = mysqli_query($_GLOBALS["conn"], "SELECT * FROM " . $class_name);
         return success(query_result_to_string($_GLOBALS, $result, $class_name));
+    case TokenType::M_DELETE_ALL:
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
+        if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
+        $confirm = readline("Are you sure you want to delete all objects of class " . $class_name . "? (y/n) ");
+        if ($confirm!== "y" && $confirm !== "yes") return false;
+        mysqli_query($_GLOBALS["conn"], "DELETE FROM " . $class_name);
+        return true;
     case TokenType::M_BUILD:
         if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
         if ($lex[$i]["type"] !== TokenType::ID && $lex[$i][$type] !== TokenType::CLASS_ID)
