@@ -143,7 +143,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         $result = mysqli_query($_GLOBALS["conn"], "SELECT * FROM " . $class_name);
         return success(query_result_to_string($_GLOBALS, $result, $class_name));
-    case TokenType::M_DELETE_ALL:
+    case TokenType::M_DELETE_ALL_OBJECTS:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
@@ -153,11 +153,11 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         return true;
     case TokenType::M_BUILD:
         if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
-        if ($lex[$i]["type"] !== TokenType::ID && $lex[$i][$type] !== TokenType::CLASS_ID)
+        if ($lex[$i]["type"] !== TokenType::ID && $lex[$i]["type"] !== TokenType::CLASS_ID)
             return expected_but_found($_GLOBALS, $lex[$i], $line, "class name");
         $class_name = $lex[$i]["value"];
+        $rebuild = ($lex[$i]["type"] === TokenType::CLASS_ID);
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
-        $rebuild = $lex[$i]["type"] === TokenType::CLASS_ID;
         if (!$lex = lex_file($_GLOBALS, $class_name)) return false;
         $file_vec = $lex["file_vec"];
         $file_path = $lex["file_path"];
@@ -200,6 +200,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 return error($_GLOBALS["MYSQL_ERROR"]);
             
             $_GLOBALS["class_map"][$class_name] = new Map($var_map);
+            $_GLOBALS["JAVA_TYPES"][] = $class_name;
             return true;
         }
         // TODO: Code for rebuild
