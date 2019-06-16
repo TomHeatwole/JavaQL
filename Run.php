@@ -148,8 +148,18 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         $confirm = readline("Are you sure you want to delete all objects of class " . $class_name . "? (y/n) ");
-        if ($confirm!== "y" && $confirm !== "yes") return false;
+        if ($confirm !== "y" && $confirm !== "yes") return false;
         mysqli_query($_GLOBALS["conn"], "DELETE FROM " . $class_name);
+        return true;
+    case TokenType::M_DELETE_CLASS:
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
+        if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
+        // TODO: Make sure no other classes depend on this class. Error message if they do
+        $confirm = readline("Are you sure you want remove class " . $class_name . " and delete all of its objects? (y/n) ");
+        if ($confirm !== "y" && $confirm !== "yes") return false;
+        mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $class_name);
+        $_GLOBALS["class_map"]->remove($class_name);
         return true;
     case TokenType::M_BUILD:
         if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
