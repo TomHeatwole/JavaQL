@@ -173,7 +173,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             return found_location($file_path, $lex[$i]["line_num"]);
         $vars = vec[];
         while ($lex[++$i]["type"] !== TokenType::R_CURLY) {
-            if (!$_GLOBALS["JAVA_TYPES"]->containsKey($lex[$i]["type"])) {
+            if (!$_GLOBALS["JAVA_TYPES"]->containsKey($lex[$i]["type"]) && $lex[$i]["value"] !== $class_name) {
                 unexpected_token($lex[$i], $file_vec[$lex[$i]["line_num"]]);
                 return found_location($file_path, $lex[$i]["line_num"]);
             }
@@ -200,7 +200,6 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 return error($_GLOBALS["MYSQL_ERROR"]);
             
             $_GLOBALS["class_map"][$class_name] = new Map($var_map);
-            $_GLOBALS["JAVA_TYPES"][] = $class_name;
             return true;
         }
         // TODO: Code for rebuild
