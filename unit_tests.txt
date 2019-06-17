@@ -17,9 +17,9 @@ getAllObjects(User);
 getAllObjects(Prims);
 getAllObjects(Post);
 OUTPUT
-\[\]
-\[\]
-\[\]
+[]
+[]
+[]
 
 NAME
 delete all, are you sure, no - doesn't delete
@@ -29,47 +29,47 @@ deleteAllObjects(User);
 no
 getAllObjects(User);
 OUTPUT
-\[
-    \{
+[
+    {
         "username": "I_HATE_YEXT",
         "password": 13425125123,
         "bestFriend": "null",
         "data": "null"
-    \}
-\]
+    }
+]
 
 NAME
 get class names
 INPUT
 getClassNames()
 OUTPUT
-\[
+[
     "Post",
     "Prims",
     "User"
-\]
+]
 
 NAME
 get description
 INPUT
 getDesc(Post);
 OUTPUT
-\{
+{
     "content": "String",
     "owner": "User"
-\}
+}
 
 NAME
 get all descriptions
 INPUT
 getAllDesc()
 OUTPUT
-\{
-    "Post": \{
+{
+    "Post": {
         "content": "String",
         "owner": "User"
-    \},
-    "Prims": \{
+    },
+    "Prims": {
         "s": "String",
         "b": "byte",
         "sh": "short",
@@ -79,14 +79,14 @@ OUTPUT
         "d": "double",
         "c": "char",
         "boo": "boolean"
-    \},
-    "User": \{
+    },
+    "User": {
         "username": "String",
         "password": "long",
         "bestFriend": "User",
         "data": "Prims"
-    \}
-\}
+    }
+}
 
 NAME
 get local variables
@@ -98,13 +98,13 @@ Post p;
 Post p2 = new Post("this is a post", null);
 getLocalVariables();
 OUTPUT
-\{
+{
     "s": "",
     "q": "your mom",
-    "f": 2\.344e\+16,
+    "f": 2.344e+16,
     "p": "null",
-    "p2": "Post@[1-9]\d*"
-\}
+    "p2": "Post@#"
+}
 
 NAME
 get variables null
@@ -112,9 +112,9 @@ INPUT
 Post this_is_null
 getVariables(this_is_null);
 OUTPUT
-getVariables\(this_is_null\);
-             \^
-Error: getVariables\(\) expects non-null parameter
+getVariables(this_is_null);
+             ^
+Error: getVariables() expects non-null parameter
 
 NAME
 get variables primitive
@@ -122,9 +122,9 @@ INPUT
 int this_is_prim = 44;
 getVariables(this_is_prim);
 OUTPUT
-getVariables\(this_is_prim\);
-             \^
-Error: getVariables\(\) expects non-primitive parameter
+getVariables(this_is_prim);
+             ^
+Error: getVariables() expects non-primitive parameter
 
 NAME
 get variables success on existing variable
@@ -132,18 +132,18 @@ INPUT
 Post not_prim = new Post("this is a post", null);
 getVariables(not_prim);
 OUTPUT
-\{
+{
     "content": "this is a post",
     "owner": "null"
-\}
+}
 
 NAME
 get variables success on new variable
 INPUT
 getVariables(new Post("this is also a post", null));
 OUTPUT
-\{
+{
     "content": "this is also a post",
     "owner": "null"
-\}
+}
 

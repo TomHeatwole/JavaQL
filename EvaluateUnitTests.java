@@ -1,6 +1,5 @@
 import java.util.Scanner;
 import java.io.File;
-import java.util.regex.Pattern;
 
 public class EvaluateUnitTests {
 
@@ -77,10 +76,25 @@ public class EvaluateUnitTests {
             readUntilNext(actual);
             return -1;
         }
-        if (Pattern.matches(e, a)) return 0;
+        if (patternMatch(e, a)) return 0;
         readUntilNext(actual);
         readUntilNext(expected);
         return -1;
+    }
+
+    public static boolean patternMatch(String e, String a) {
+        if (e.equals(a)) return true;
+        int i = 0;
+        int j = 0;
+        for (; i < e.length() && j < a.length(); i++) {
+            if (e.charAt(i) != a.charAt(j)) {
+                if (e.charAt(i) != '#') return false;
+                if (!Character.isDigit(a.charAt(j))) return false;
+                if (a.charAt(j) == '0') return false;
+                while (++j < a.length() && Character.isDigit(a.charAt(j)));
+            } else j++;
+        }
+        return j == a.length() && i == e.length();
     }
 
     public static void readUntilNext(Scanner s) {
