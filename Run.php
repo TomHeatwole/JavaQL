@@ -507,7 +507,7 @@ function query_result_to_string(dict $_GLOBALS, $result, string $class_name): st
     return json_encode($print, JSON_PRETTY_PRINT);
 }
 
-function get_display_val_prim($val): string {
+function get_display_val_prim($val) {
     return is_string($val) ? substr($val, 1, count($val) - 2) : $val;
 }
 

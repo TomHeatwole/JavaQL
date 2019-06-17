@@ -1,17 +1,96 @@
 NAME
-lex error
+do nothing on empty input
 INPUT
-lol
 OUTPUT
-lol
-   ^
-Error: unexpected token: end of line
 
 NAME
-example test
+delete all deletes all
 INPUT
-remfhaha t = new remfhaha(false, "haha", 46);
-t.haha
+new User("I_HATE_YEXT", 13425125123, null, null);
+deleteAllObjects(User);
+y
+getAllObjects(User);
 OUTPUT
-false
+[]
+
+NAME
+delete all, are you sure, no - doesn't delete
+INPUT
+new User("I_HATE_YEXT", 13425125123, null, null);
+deleteAllObjects(User);
+no
+getAllObjects(User);
+OUTPUT
+[
+    {
+        "username": "I_HATE_YEXT",
+        "password": 13425125123,
+        "bestFriend": "null",
+        "data": "null"
+    }
+]
+
+NAME
+get class names
+INPUT
+getClassNames()
+OUTPUT
+[
+    "Post",
+    "Prims",
+    "User"
+]
+
+NAME
+get description
+INPUT
+getDesc(Post);
+OUTPUT
+{
+    "content": "String",
+    "owner": "User"
+}
+
+NAME
+get all descriptions
+INPUT
+getAllDesc()
+OUTPUT
+{
+    "Post": {
+        "content": "String",
+        "owner": "User"
+    },
+    "Prims": {
+        "s": "String",
+        "b": "byte",
+        "sh": "short",
+        "i": "int",
+        "l": "long",
+        "f": "float",
+        "d": "double",
+        "c": "char",
+        "boo": "boolean"
+    },
+    "User": {
+        "username": "String",
+        "password": "long",
+        "bestFriend": "User",
+        "data": "Prims"
+    }
+}
+
+NAME
+get local variables
+INPUT
+String s;
+String q = "your mom"
+float f = 234.4e14;
+getLocalVariables();
+OUTPUT
+{
+    "s": "",
+    "q": "your mom",
+    "f": 2.344e+16
+}
 

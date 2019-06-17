@@ -29,3 +29,4 @@ rm unit_test_barrier.txt
 rm test_expected_outputs.txt
 rm test_names.txt
 rm test_inputs.txt
+rm test_outputs.txt
