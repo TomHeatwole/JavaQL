@@ -155,7 +155,17 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
-        // TODO: Make sure no other classes depend on this class. Error message if they do
+        $ruined_classes = vec[];
+        foreach ($_GLOBALS["class_map"]->toKeysArray() as $key) {
+            if ($key === $class_name) continue;
+            // TODO: Also check for arrays and lists of this type later
+            foreach ($_GLOBALS["class_map"][$key] as $type) {
+                if ($type === $class_name) $ruined_classes[] = $key;
+            }
+        }
+        if (count($ruined_classes) > 0)
+            return error("cannot remove class because the following classes have objects of type "
+            . $class_name . ": " . implode(", ", $ruined_classes));
         $confirm = readline("Are you sure you want remove class " . $class_name . " and delete all of its objects? (y/n) ");
         if ($confirm !== "y" && $confirm !== "yes") return false;
         mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $class_name);
