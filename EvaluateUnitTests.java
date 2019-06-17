@@ -1,5 +1,6 @@
 import java.util.Scanner;
 import java.io.File;
+import java.util.regex.Pattern;
 
 public class EvaluateUnitTests {
 
@@ -76,7 +77,7 @@ public class EvaluateUnitTests {
             readUntilNext(actual);
             return -1;
         }
-        if (a.equals(e)) return 0;
+        if (Pattern.matches(e, a)) return 0;
         readUntilNext(actual);
         readUntilNext(expected);
         return -1;

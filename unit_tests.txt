@@ -7,11 +7,19 @@ NAME
 delete all deletes all
 INPUT
 new User("I_HATE_YEXT", 13425125123, null, null);
+deleteAllObjects(Prims);
+y
 deleteAllObjects(User);
 y
+deleteAllObjects(Post);
+y
 getAllObjects(User);
+getAllObjects(Prims);
+getAllObjects(Post);
 OUTPUT
-[]
+\[\]
+\[\]
+\[\]
 
 NAME
 delete all, are you sure, no - doesn't delete
@@ -21,47 +29,47 @@ deleteAllObjects(User);
 no
 getAllObjects(User);
 OUTPUT
-[
-    {
+\[
+    \{
         "username": "I_HATE_YEXT",
         "password": 13425125123,
         "bestFriend": "null",
         "data": "null"
-    }
-]
+    \}
+\]
 
 NAME
 get class names
 INPUT
 getClassNames()
 OUTPUT
-[
+\[
     "Post",
     "Prims",
     "User"
-]
+\]
 
 NAME
 get description
 INPUT
 getDesc(Post);
 OUTPUT
-{
+\{
     "content": "String",
     "owner": "User"
-}
+\}
 
 NAME
 get all descriptions
 INPUT
 getAllDesc()
 OUTPUT
-{
-    "Post": {
+\{
+    "Post": \{
         "content": "String",
         "owner": "User"
-    },
-    "Prims": {
+    \},
+    "Prims": \{
         "s": "String",
         "b": "byte",
         "sh": "short",
@@ -71,14 +79,14 @@ OUTPUT
         "d": "double",
         "c": "char",
         "boo": "boolean"
-    },
-    "User": {
+    \},
+    "User": \{
         "username": "String",
         "password": "long",
         "bestFriend": "User",
         "data": "Prims"
-    }
-}
+    \}
+\}
 
 NAME
 get local variables
@@ -86,11 +94,15 @@ INPUT
 String s;
 String q = "your mom"
 float f = 234.4e14;
+Post p;
+Post p2 = new Post("this is a post", null);
 getLocalVariables();
 OUTPUT
-{
+\{
     "s": "",
     "q": "your mom",
-    "f": 2.344e+16
-}
+    "f": 2\.344e\+16,
+    "p": "null",
+    "p2": "Post@[1-9]\d*"
+\}
 
