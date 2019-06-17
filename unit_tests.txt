@@ -106,3 +106,44 @@ OUTPUT
     "p2": "Post@[1-9]\d*"
 \}
 
+NAME
+get variables null
+INPUT
+Post this_is_null
+getVariables(this_is_null);
+OUTPUT
+getVariables\(this_is_null\);
+             \^
+Error: getVariables\(\) expects non-null parameter
+
+NAME
+get variables primitive
+INPUT
+int this_is_prim = 44;
+getVariables(this_is_prim);
+OUTPUT
+getVariables\(this_is_prim\);
+             \^
+Error: getVariables\(\) expects non-primitive parameter
+
+NAME
+get variables success on existing variable
+INPUT
+Post not_prim = new Post("this is a post", null);
+getVariables(not_prim);
+OUTPUT
+\{
+    "content": "this is a post",
+    "owner": "null"
+\}
+
+NAME
+get variables success on new variable
+INPUT
+getVariables(new Post("this is also a post", null));
+OUTPUT
+\{
+    "content": "this is also a post",
+    "owner": "null"
+\}
+

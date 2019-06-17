@@ -83,7 +83,8 @@ for (;;) {
         );
     $print_qr = $_GLOBALS["print_qr"];
     if (count($print_qr) > 0)
-        success(query_result_to_string($_GLOBALS, $query_results[$print_qr["qr_num"]], $print_qr["class_name"]));
+        // TODO: Can we always keep this as single_ ?
+        success(single_query_result_to_string($_GLOBALS, $query_results[$print_qr["qr_num"]], $print_qr["class_name"]));
 }
 
 function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
@@ -136,7 +137,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!$result = mysqli_query($_GLOBALS["conn"], "SELECT * FROM "
             . $param["type"] . " WHERE _ID=" . $param["value"]))
             return error($_GLOBALS["MYSQL_ERROR"]);
-        return success(query_result_to_string($_GLOBALS, $result, $param["type"]));
+        return success(single_query_result_to_string($_GLOBALS, $result, $param["type"]));
     case TokenType::M_GET_ALL_OBJECTS:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
@@ -505,6 +506,16 @@ function query_result_to_string(dict $_GLOBALS, $result, string $class_name): st
         $print[] = $vars;
     }
     return json_encode($print, JSON_PRETTY_PRINT);
+}
+
+function single_query_result_to_string(dict $_GLOBALS, $result, string $class_name): string {
+    $var_names = $_GLOBALS["class_map"][$class_name]->toKeysArray();
+    $var_types = $_GLOBALS["class_map"][$class_name]->toValuesArray();
+    $row = mysqli_fetch_row($result);
+    $vars = dict[];
+    for ($i = 1; $i < count($row); $i++)
+        $vars[$var_names[$i - 1]] = get_display_val($_GLOBALS, $var_types[$i - 1], $row[$i]);
+    return json_encode($vars, JSON_PRETTY_PRINT);
 }
 
 function get_display_val_prim($val) {
