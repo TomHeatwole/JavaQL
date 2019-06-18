@@ -22,7 +22,7 @@ OUTPUT
 []
 
 NAME
-delete all, are you sure, no - doesn't delete
+delete all, are you sure, no
 INPUT
 new User("I_HATE_YEXT", 13425125123, null, null);
 deleteAllObjects(User);
@@ -101,7 +101,7 @@ OUTPUT
 {
     "s": "",
     "q": "your mom",
-    "f": 2.344e+16,
+    "f": "2.344E16",
     "p": "null",
     "p2": "Post@#"
 }
@@ -145,5 +145,83 @@ OUTPUT
 {
     "content": "this is also a post",
     "owner": "null"
+}
+
+NAME
+delete class
+INPUT
+deleteClass(Post);
+y
+getClassNames();
+getDesc(Post);
+build(Post);
+OUTPUT
+[
+    "Prims",
+    "User"
+]
+getDesc(Post);
+        ^
+Error: expected class name but found unknown identifier
+
+NAME
+get all objects multiple
+INPUT
+new Post("fence post", null);
+new Post("post office", new User("mailman", 13581501231231415, null, null));
+new Post("shitpost", null);
+getAllObjects(Post);
+OUTPUT
+[
+    {
+        "content": "fence post",
+        "owner": "null"
+    },
+    {
+        "content": "post office",
+        "owner": "User@#"
+    },
+    {
+        "content": "shitpost",
+        "owner": "null"
+    }
+]
+
+NAME
+delete class, are you sure, no
+INPUT
+deleteClass(Post)
+no
+getDesc(Post);
+OUTPUT
+{
+    "content": "String",
+    "owner": "User"
+}
+
+NAME
+delete class fail on dependency
+INPUT
+deleteClass(Prims)
+OUTPUT
+Error: cannot remove class because the following classes have objects of type Prims: User
+
+NAME
+rename class variable success
+INPUT
+Post gonna_rename = new Post("postman", null);
+rename(Post.content, "data");
+gonna_rename.data
+gonna_rename.content;
+getDesc(Post);
+rename(Post.data, "content");
+OUTPUT
+"postman"
+gonna_rename.content;
+             ^
+Error: content does not exist in class Post
+{
+    "data": "String",
+    "owner": "User"
 }
 

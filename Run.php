@@ -112,8 +112,8 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         $print = dict[];
         $sym_table = $_GLOBALS["symbol_table"];
         foreach($sym_table->toKeysArray() as $key)
-            $print[$key] = $_GLOBALS["PRIM"]->contains($sym_table[$key]["type"]) ?
-                get_display_val_prim($sym_table[$key]["value"]) :
+            $print[$key] = $sym_table[$key]["type"] === "String" ?
+                remove_quotes($sym_table[$key]["value"]) :
                 get_display_val($_GLOBALS, $sym_table[$key]["type"], $sym_table[$key]["value"]);
         return success(json_encode($print, JSON_PRETTY_PRINT));
     case TokenType::M_GET_VARIABLES:
@@ -206,6 +206,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::SEMI))
                 return found_location($file_path, $lex[$i]["line_num"]);
             $vars[] = shape("type" => $type, "name" => $name);
+            // TODO: Make sure two variables aren't called the same thing
         }
         if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::EOF))
             return found_location($file_path, $lex[$i]["line_num"]);
@@ -243,17 +244,24 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             $is_class = false;
             if (!$_GLOBALS["ALL_IDS"]->contains($lex[++$i]["type"])) return unexpected_token($lex[$i], $line);
             $var_name = $lex[$i]["value"];
+            if (!$_GLOBALS["class_map"][$class_name]->containsKey($var_name))
+                return carrot_and_error($var_name . " does not exist in class "
+                . $class_name, $line, $lex[$i]["char_num"]);
             $i++;
         }
         if (!must_match_unexpected($lex, $i, $line, TokenType::COMMA)) return false;
-        $new_name_type = $lex[++$i]["type"];
-        if (!$_GLOBALS["ALL_IDS"]->contains($new_name_type)) return unexpected_token($lex[$i], $line);
-        if ($is_class && $new_name_type !== TokenType::ID)
+        $i++;
+        if (!($new_name = parse_type($_GLOBALS, $lex, &$i, $line, "String"))) return false;
+        $new_name = remove_quotes($new_name["value"]);
+        if ($is_class) {
+            // TODO: make sure new class name is unique
+            /*
             return carrot_and_error("new class name nust be unique - found "
             . $_GLOBALS["TOKEN_NAME_MAP"][$new_name_type], $line, $lex[$i]["char_num"]);
-        $new_name = $lex[$i]["value"];
-        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
-        if ($is_class) return false;  // TODO: return rename_class($_GLOBALS, $class_name, $new_name);
+             */
+        }
+        if (!r_paren_semi($_GLOBALS, $lex, $i, $line)) return false;
+        if ($is_class) return error("NOT IMPLEMENTED");  // TODO: return rename_class($_GLOBALS, $class_name, $new_name);
         /* class stuff:
             // check if there are any differences betweem classes/ and current database. Fail if there are.
             // TODO: Are you sure?
@@ -267,11 +275,13 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             // - rename ALL columns of type $class_name
          */
         // TODO: Check if there are differences with class file.
+        if ($new_name === $var_name) return true;
+        foreach($_GLOBALS["class_map"][$class_name]->toKeysArray() as $key) {
+            if ($key === $new_name) return error($class_name . " already has a variable named " . $new_name);
+        }
         if (!mysqli_query($_GLOBALS["conn"], "ALTER TABLE " .
             $class_name . " RENAME COLUMN " . $var_name . " TO " . $new_name));
         $_GLOBALS["class_map"][$class_name] = map_replace($_GLOBALS["class_map"][$class_name], $var_name, $new_name);
-        // var_dump($_GLOBALS["class_map"][$class_name]);
-
         // TODO: Edit file to reflect change?
         return true;
     case TokenType::NEW_LITERAL:
@@ -398,12 +408,13 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
         $parent = shape("type" => $type, "value" => $value);
         $value = mysqli_fetch_row($result)[0];
         $type = $class_var_type;
+        if ($type == "String") $value = "\"" . $value . "\"";
         if ($lex[++$i]["type"] !== TokenType::DOT || $is_primitive) break;
     }
     return shape("parent" => $parent, "value" => $value, "type" => $type, "row_name" => $row_name);
 }
 
-// return value if parsed correctly or false otherwise
+// return sym if parsed correctly or false otherwise
 function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) {
     // TODO: Implement default
     $token = $lex[$i++];
@@ -518,10 +529,6 @@ function single_query_result_to_string(dict $_GLOBALS, $result, string $class_na
     return json_encode($vars, JSON_PRETTY_PRINT);
 }
 
-function get_display_val_prim($val) {
-    return is_string($val) ? substr($val, 1, count($val) - 2) : $val;
-}
-
 function get_display_val(dict $_GLOBALS, string $type, $val) {
     if ($type === "boolean") return $val && $val !== "false" ? "true" : "false";
     if ($type === "double" || $type === "float") {
@@ -532,6 +539,10 @@ function get_display_val(dict $_GLOBALS, string $type, $val) {
     if (!$_GLOBALS["PRIM"]->contains($type))
         return $val === null ? "null" : $type . "@" . $val;
     return $val;
+}
+
+function remove_quotes(string $val) {
+    return substr($val, 1, strlen($val) - 2);
 }
 
 function r_paren_semi(dict $_GLOBALS, $lex, int $i, string $line): boolean {
