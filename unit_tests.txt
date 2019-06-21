@@ -265,7 +265,7 @@ create local variable success
 INPUT
 String local_succ;
 float local_succ2 = 33e-5;
-Post local_succ3 = new Post("Created succesfully", null);
+Post local_succ3 = new Post("Post traumatic stress disorder", null);
 OUTPUT
 
 NAME
@@ -356,4 +356,23 @@ OUTPUT
 "posted up"
 User@#
 "Malc"
+
+NAME
+new object fails on wrong constructor
+INPUT
+User notAUser = new Post("Post Malone", null);
+OUTPUT
+User notAUser = new Post("Post Malone", null);
+                    ^
+Error: expected "User" but found "Post"
+
+NAME
+new object fails on bad parameters
+INPUT
+Post badParam = new Post(334, null);
+OUTPUT
+Post badParam = new Post(334, null);
+                         ^
+Error: expected String but found int
+Post constructor expects the following parameters: (String content, User owner)
 

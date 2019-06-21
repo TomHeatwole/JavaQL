@@ -320,8 +320,9 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 return success(get_display_val($_GLOBALS, $d["type"], $d["value"]));
             }
             if (!must_match_unexpected($lex, $i++, $line, TokenType::ASSIGN)) return false;
-            if (($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"])["value"]) === false) return false;
+            if (!($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"]))) return false;
             else if (!must_end($lex, $i, $line)) return false;
+            $set_val = $set_val["value"];
             $query = "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=";
             if ($set_val instanceof QueryResult) {
                 $query_pieces = vec[$query];
@@ -351,18 +352,16 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     $var_values = vec[];
     $i++;
     for ($j = 0; $j < count($var_types); $j++) {
-        // === false to check for "0"
-        if (($var_values[] = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j])["value"]) === false) {
+        if (!($var_val = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j]))) {
             echo $class_name, " constructor expects the following parameters: (";
             $var_names = $class_map[$class_name]->toKeysArray();
             for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
             return fail($var_types[count($var_names) - 1] . " " . $var_names[count($var_names) - 1] . ")");
         }
-        if ($j + 1 < count($var_types) && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return;
+        $var_values[] = $var_val["value"];
+        if ($j + 1 < count($var_types) && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return false;
     }
-    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) {
-        return false;
-    }
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
     $query_pieces = vec[];
     $query = "INSERT INTO " . $class_name . " VALUES (default";
     for ($j = 0; $j < count($var_types); $j++) {
