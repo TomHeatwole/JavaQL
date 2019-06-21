@@ -326,3 +326,34 @@ true
 -0.324
 0.0
 3.5E300
+
+NAME
+reassign without dereference success
+INPUT
+int reassign1;
+reassign1 = 3;
+reassign1
+User reassign2;
+reassign2 = new User("changing this user", 1341250100250102, null, null);
+reassign2;
+reassign2.bestFriend;
+OUTPUT
+3
+User@#
+null
+
+NAME
+reassign with dereference success
+INPUT
+Post reassign3 = new Post("post up", null);
+reassign3.content = "posted up";
+reassign3.owner = new User("Malcom", 12056870283945012, null, null);
+reassign3.content;
+reassign3.owner
+reassign3.owner.username = "Malc";
+reassign3.owner.username;
+OUTPUT
+"posted up"
+User@#
+"Malc"
+
