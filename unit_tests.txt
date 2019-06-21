@@ -4,7 +4,7 @@ INPUT
 OUTPUT
 
 NAME
-delete all deletes all
+delete all objects success
 INPUT
 new User("I_HATE_YEXT", 13425125123, null, null);
 deleteAllObjects(Prims);
@@ -22,7 +22,7 @@ OUTPUT
 []
 
 NAME
-delete all, are you sure, no
+delete all objects, are you sure, no
 INPUT
 new User("I_HATE_YEXT", 13425125123, null, null);
 deleteAllObjects(User);
@@ -225,3 +225,104 @@ Error: content does not exist in class Post
     "owner": "User"
 }
 
+NAME
+rename class variable fail on used variable name
+INPUT
+rename(User.username, "data");
+OUTPUT
+Error: User already has a variable named data
+
+NAME
+rename class variable fail on variable does not exist
+INPUT
+rename(Prims.fake_var, "real_var");
+OUTPUT
+rename(Prims.fake_var, "real_var");
+             ^
+Error: fake_var does not exist in class Prims
+
+NAME
+create local variable fail on class name
+INPUT
+User Prims = new User("primmy", 2e13, null, null);
+OUTPUT
+User Prims = new User("primmy", 2e13, null, null);
+     ^
+Error: JavaQL variables may not share names with classes
+
+NAME
+create local variable fail on used name
+INPUT
+String s_used;
+int s_used = 335;
+OUTPUT
+int s_used = 335;
+    ^
+Error: variable s_used is already defined
+
+NAME
+create local variable success
+INPUT
+String local_succ;
+float local_succ2 = 33e-5;
+Post local_succ3 = new Post("Created succesfully", null);
+OUTPUT
+
+NAME
+display local variable success on primitive
+INPUT
+String display_prim1;
+String display_prim2 = "display";
+byte display_prim3;
+byte display_prim4 = -35;
+short display_prim5;
+short display_prim6 = 667;
+int display_prim7;
+int display_prim8 = -2100000000;
+long display_prim9;
+long display_prim10 = 42100000000;
+char display_prim11;
+char display_prim12 = 'z';
+boolean display_prim13;
+boolean display_prim14 = true;
+float display_prim15;
+float display_prim16 = -3.24e-1;
+double display_prim17;
+double display_prim18 = 3.5e300;
+display_prim1;
+display_prim2;
+display_prim3;
+display_prim4;
+display_prim5;
+display_prim6;
+display_prim7;
+display_prim8;
+display_prim9;
+display_prim10;
+display_prim11;
+display_prim12;
+display_prim13;
+display_prim14;
+display_prim15;
+display_prim16;
+display_prim17;
+display_prim18;
+OUTPUT
+""
+"display"
+0
+-35
+0
+667
+0
+-2100000000
+0
+42100000000
+''
+'z'
+false
+true
+0.0
+-0.324
+0.0
+3.5E300

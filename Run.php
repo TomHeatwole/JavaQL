@@ -305,7 +305,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if ($end = check_end($lex, ++$i, $line)) {
             if ($end === -1) return false;
             $_GLOBALS["symbol_table"][$name] = shape("type" => $e, "value" => $_GLOBALS["DEFAULTS"][$j_type]);
-            return false;
+            return true;
         }
         if (!must_match_unexpected($lex, $i, $line, TokenType::ASSIGN)) return false;
         return assign($_GLOBALS, $lex, ++$i, $e, $line, $name);
@@ -449,34 +449,33 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     case TokenType::INT_LITERAL:
         $int_val = (int)$token["value"];
         if ($e === "float") {
-            if ($int_val <= $_GLOBALS["FLOAT_MAX"]) return shape("value" => $token["value"], "type" => $e);
+            if ($int_val <= $_GLOBALS["FLOAT_MAX"]) return shape("value" => floatval($token["value"]), "type" => $e);
             return carrot_and_error("int literal is too large for type float", $line, $token["char_num"]);
         }
         if ($e === "double") {
-            if ((double)$token["value"] !== INF) return shape("value" => $token["value"], "type" => $e);
+            if ((double)$token["value"] !== INF) return shape("value" => doubleval($token["value"]), "type" => $e);
             return carrot_and_error("int literal is too large for type double", $line, $token["char_num"]);
         }
         if ($_GLOBALS["INT_MAX"]->containsKey($e)) {
             $max = $_GLOBALS["INT_MAX"][$e];
-            // TODO: Figure out how to check for longs on a 32 bit machine
-            if ("" . $int_val !== int_trim_zeros($token["value"])) 
-                return carrot_and_error("integer value too large", $line, $token["char_num"]);
+            // TODO: Does this work for longs?
             if ($int_val > $max || -$int_val > $max + 1)
                 return carrot_and_error("integer value " . $int_val .
                 " is too large for type " . $e, $line, $token["char_num"]); 
+            // TODO: intval truncates on e instead of supporting scientific notation
             return shape("value" => intval($token["value"]), "type" => $e);
         }
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::FLOAT_LITERAL:
-        $float_val = (double)$token["value"];
-        if ($float_val === INF)
+        $double_val = doubleval($token["value"]);
+        if ($double_val === INF)
             return carrot_and_error("decimal literal is too large", $line, $token["char_num"]);
         if ($e === "float") {
             if ($float_val > $_GLOBALS["FLOAT_MAX"])
                 return carrot_and_error("decimal literal is too large for type float", $line, $token["char_num"]);
-            return shape("value" => doubleval($token["value"]), "type" => $e);
+            return shape("value" => floatval($token["value"]), "type" => $e);
         }
-        if ($e === "double") return doubleval($token["value"]);
+        if ($e === "double") return shape("value" => $double_val, "type" => $e);
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::CHAR_LITERAL:
         if ($e === "char") return shape("value" => $token["value"], "type" => $e);
@@ -831,7 +830,12 @@ function lex_number(string $line, int &$i, bool $decimal) {
 
 function int_trim_zeros(string $val): string {
     $i = 0;
+    $prefix = "";
+    if ($val[0] === "-") {
+        $i = 1;
+        $prefix = '-';
+    }
     for (; $i < strlen($val) - 1; $i++)
         if ($val[$i] !== "0") break;
-    return substr($val, $i);
+    return $prefix . substr($val, $i);
 }
