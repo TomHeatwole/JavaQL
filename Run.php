@@ -407,7 +407,8 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
         $parent = shape("type" => $type, "value" => $value);
         $value = mysqli_fetch_row($result)[0];
         $type = $class_var_type;
-        if ($type == "String") $value = "\"" . $value . "\"";
+        if ($type === "String") $value = "\"" . $value . "\"";
+        else if ($type ==="char") $value = "'" . $value . "'";
         if ($lex[++$i]["type"] !== TokenType::DOT || $is_primitive) break;
     }
     return shape("parent" => $parent, "value" => $value, "type" => $type, "row_name" => $row_name);

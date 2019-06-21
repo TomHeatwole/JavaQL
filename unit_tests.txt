@@ -376,3 +376,15 @@ Post badParam = new Post(334, null);
 Error: expected String but found int
 Post constructor expects the following parameters: (String content, User owner)
 
+NAME
+newsted new statement success
+INPUT
+Post nesty = new Post("post graduate", new User("Tom Heatwole, PHD", 1743579084573, new User("My number 1 boy", 7072082708, null, null), new Prims("", 0, 0, 0, 0, 0, 0, 'a', false)));
+nesty
+nesty.owner.bestFriend.username
+nesty.owner.data.c
+OUTPUT
+Post@#
+"My number 1 boy"
+'a'
+
