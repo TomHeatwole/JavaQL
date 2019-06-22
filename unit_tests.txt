@@ -441,5 +441,60 @@ byte param2 = -127;
 char param3;
 boolean param4 = true; 
 new Prims(param1, param2, param2, param2, param2, param2, param2, param3, param4);
+User userParam = new User("hacker", 460709345793457, null, null);
+new Post("Post request", userParam);
 OUTPUT
+
+NAME
+parse type fail on ids
+INPUT
+long longID = 15016801680608708108780
+float floatID = 44.4;
+Post postID = new Post("Washington Post", null);
+new Prims("", longID
+new Prims("", floatID
+new Post("New York Post", postID);
+OUTPUT
+new Prims("", longID
+              ^
+Error: expected byte but found long variable
+Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
+new Prims("", floatID
+              ^
+Error: expected byte but found float variable
+Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
+new Post("New York Post", postID);
+                          ^
+Error: expected User but found Object variable
+Post constructor expects the following parameters: (String content, User owner)
+
+NAME
+parse type fail without expected type
+INPUT
+getVariables("show me the variables");
+OUTPUT
+getVariables("show me the variables");
+             ^
+Error: unexpected token: "show me the variables"
+
+NAME
+parse type fail on literals
+INPUT
+new Prims('a'
+new Prims("", 0, 0, 0, 0, 999999999999999999999999999999999999999999999999, 0, 'a', false);
+new Prims("", 0, 0, 0, 0, 0, 99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999, 'a', false);
+new Prims("", 0, 0, 0, 0, 0, 0, 'a', false);
+OUTPUT
+new Prims('a'
+          ^
+Error: expected String but found char
+Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
+new Prims("", 0, 0, 0, 0, 999999999999999999999999999999999999999999999999, 0, 'a', false);
+                          ^
+Error: int literal is too large for type float
+Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
+new Prims("", 0, 0, 0, 0, 0, 99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999, 'a', false);
+                             ^
+Error: int literal is too large for type double
+Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
 

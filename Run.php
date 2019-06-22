@@ -458,7 +458,7 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     case TokenType::INT_LITERAL:
         $int_val = (int)$token["value"];
         if ($e === "float") {
-            if ($int_val <= $_GLOBALS["FLOAT_MAX"]) return shape("value" => floatval($token["value"]), "type" => $e);
+            if (doubleval($token["value"]) <= $_GLOBALS["FLOAT_MAX"]) return shape("value" => floatval($token["value"]), "type" => $e);
             return carrot_and_error("int literal is too large for type float", $line, $token["char_num"]);
         }
         if ($e === "double") {
