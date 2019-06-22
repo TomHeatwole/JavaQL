@@ -247,12 +247,14 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             if (!$_GLOBALS["class_map"][$class_name]->containsKey($var_name))
                 return carrot_and_error($var_name . " does not exist in class "
                 . $class_name, $line, $lex[$i]["char_num"]);
+            $type = $_GLOBALS["class_map"][$class_name][$var_name];
             $i++;
         }
         if (!must_match_unexpected($lex, $i, $line, TokenType::COMMA)) return false;
         $i++;
         if (!($new_name = parse_type($_GLOBALS, $lex, &$i, $line, "String"))) return false;
         $new_name = remove_quotes($new_name["value"]);
+        if (strlen($new_name) === 0) return error("cannot rename variable to empty string");
         if ($is_class) {
             // TODO: make sure new class name is unique
             /*
@@ -266,7 +268,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             // check if there are any differences betweem classes/ and current database. Fail if there are.
             // TODO: Are you sure?
             $query = "RENAME TABLE " . $class_name . " TO " . $class_name;
-            if (!mysqli_query($_GLOBALS["conn"], $query)) return error(!$_GLOBALS["MYSQL_ERROR"]);
+            if (!mysqli_query($_GLOBALS["conn"], $query)) return error(!$_GLOBALS["/YSQL_ERROR"]);
             $_GLOBALS["class_map"][$new_name] = $_GLOBALS["class_map"][$class_name];
             $_GLOBALS["class_map"]->remove($class_name);
             // - rename in ALL files
@@ -279,8 +281,15 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         foreach($_GLOBALS["class_map"][$class_name]->toKeysArray() as $key) {
             if ($key === $new_name) return error($class_name . " already has a variable named " . $new_name);
         }
+        $old_row_name = $var_name;
+        $new_row_name = $new_name;
+        if (!$_GLOBALS["PRIM"]->contains($type)) {
+            $old_row_name = java_ref_to_mysql($type, $old_row_name);
+            $new_row_name = java_ref_to_mysql($type, $new_row_name);
+        }
         if (!mysqli_query($_GLOBALS["conn"], "ALTER TABLE " .
-            $class_name . " RENAME COLUMN " . $var_name . " TO " . $new_name));
+            $class_name . " RENAME COLUMN " . $old_row_name. " TO " . $new_row_name))
+            return error($_GLOBALS["MYSQL_ERROR"]);
         $_GLOBALS["class_map"][$class_name] = map_replace($_GLOBALS["class_map"][$class_name], $var_name, $new_name);
         // TODO: Edit file to reflect change?
         return true;
@@ -408,7 +417,7 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
         $value = mysqli_fetch_row($result)[0];
         $type = $class_var_type;
         if ($type === "String") $value = "\"" . $value . "\"";
-        else if ($type ==="char") $value = "'" . $value . "'";
+        else if ($type === "char") $value = "'" . $value . "'";
         if ($lex[++$i]["type"] !== TokenType::DOT || $is_primitive) break;
     }
     return shape("parent" => $parent, "value" => $value, "type" => $type, "row_name" => $row_name);
@@ -839,3 +848,4 @@ function int_trim_zeros(string $val): string {
         if ($val[$i] !== "0") break;
     return $prefix . substr($val, $i);
 }
+

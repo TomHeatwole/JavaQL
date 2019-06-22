@@ -109,28 +109,28 @@ OUTPUT
 NAME
 get variables null
 INPUT
-Post this_is_null
-getVariables(this_is_null);
+Post thisIsNull
+getVariables(thisIsNull);
 OUTPUT
-getVariables(this_is_null);
+getVariables(thisIsNull);
              ^
 Error: getVariables() expects non-null parameter
 
 NAME
 get variables primitive
 INPUT
-int this_is_prim = 44;
-getVariables(this_is_prim);
+int thisIsPrim = 44;
+getVariables(thisIsPrim);
 OUTPUT
-getVariables(this_is_prim);
+getVariables(thisIsPrim);
              ^
 Error: getVariables() expects non-primitive parameter
 
 NAME
 get variables success on existing variable
 INPUT
-Post not_prim = new Post("this is a post", null);
-getVariables(not_prim);
+Post notPrim = new Post("this is a post", null);
+getVariables(notPrim);
 OUTPUT
 {
     "content": "this is a post",
@@ -209,20 +209,24 @@ Error: cannot remove class because the following classes have objects of type Pr
 NAME
 rename class variable success
 INPUT
-Post gonna_rename = new Post("postman", null);
+Post gonnaRename = new Post("postman", null);
 rename(Post.content, "data");
-gonna_rename.data
-gonna_rename.content;
+rename(Post.owner, "writer");
+gonnaRename.data
+gonnaRename.content;
+gonnaRename.writer;
 getDesc(Post);
 rename(Post.data, "content");
+rename(Post.writer, "owner");
 OUTPUT
 "postman"
-gonna_rename.content;
-             ^
+gonnaRename.content;
+            ^
 Error: content does not exist in class Post
+null
 {
     "data": "String",
-    "owner": "User"
+    "writer": "User"
 }
 
 NAME
@@ -233,13 +237,20 @@ OUTPUT
 Error: User already has a variable named data
 
 NAME
+rename class variable fail on empty string
+INPUT
+rename(User.username, "")
+OUTPUT
+Error: cannot rename variable to empty string
+
+NAME
 rename class variable fail on variable does not exist
 INPUT
-rename(Prims.fake_var, "real_var");
+rename(Prims.fakeVar, "real var");
 OUTPUT
-rename(Prims.fake_var, "real_var");
+rename(Prims.fakeVar, "real var");
              ^
-Error: fake_var does not exist in class Prims
+Error: fakeVar does not exist in class Prims
 
 NAME
 create local variable fail on class name
@@ -253,60 +264,60 @@ Error: JavaQL variables may not share names with classes
 NAME
 create local variable fail on used name
 INPUT
-String s_used;
-int s_used = 335;
+String sUsed;
+int sUsed = 335;
 OUTPUT
-int s_used = 335;
+int sUsed = 335;
     ^
-Error: variable s_used is already defined
+Error: variable sUsed is already defined
 
 NAME
 create local variable success
 INPUT
-String local_succ;
-float local_succ2 = 33e-5;
-Post local_succ3 = new Post("Post traumatic stress disorder", null);
+String localSucc;
+float localSucc2 = 33e-5;
+Post localSucc3 = new Post("Post traumatic stress disorder", null);
 OUTPUT
 
 NAME
 display local variable success on primitive
 INPUT
-String display_prim1;
-String display_prim2 = "display";
-byte display_prim3;
-byte display_prim4 = -35;
-short display_prim5;
-short display_prim6 = 667;
-int display_prim7;
-int display_prim8 = -2100000000;
-long display_prim9;
-long display_prim10 = 42100000000;
-char display_prim11;
-char display_prim12 = 'z';
-boolean display_prim13;
-boolean display_prim14 = true;
-float display_prim15;
-float display_prim16 = -3.24e-1;
-double display_prim17;
-double display_prim18 = 3.5e300;
-display_prim1;
-display_prim2;
-display_prim3;
-display_prim4;
-display_prim5;
-display_prim6;
-display_prim7;
-display_prim8;
-display_prim9;
-display_prim10;
-display_prim11;
-display_prim12;
-display_prim13;
-display_prim14;
-display_prim15;
-display_prim16;
-display_prim17;
-display_prim18;
+String displayPrim1;
+String displayPrim2 = "display";
+byte displayPrim3;
+byte displayPrim4 = -35;
+short displayPrim5;
+short displayPrim6 = 667;
+int displayPrim7;
+int displayPrim8 = -2100000000;
+long displayPrim9;
+long displayPrim10 = 42100000000;
+char displayPrim11;
+char displayPrim12 = 'z';
+boolean displayPrim13;
+boolean displayPrim14 = true;
+float displayPrim15;
+float displayPrim16 = -3.24e-1;
+double displayPrim17;
+double displayPrim18 = 3.5e300;
+displayPrim1;
+displayPrim2;
+displayPrim3;
+displayPrim4;
+displayPrim5;
+displayPrim6;
+displayPrim7;
+displayPrim8;
+displayPrim9;
+displayPrim10;
+displayPrim11;
+displayPrim12;
+displayPrim13;
+displayPrim14;
+displayPrim15;
+displayPrim16;
+displayPrim17;
+displayPrim18;
 OUTPUT
 ""
 "display"
@@ -387,4 +398,48 @@ OUTPUT
 Post@#
 "My number 1 boy"
 'a'
+
+NAME
+dereference fail when variable does not exist
+INPUT
+Post noLikes = new Post("postcard", null);
+noLikes.likes
+new Prims("", 0, 0, 0, 0, 0, noLikes.likes, 'a', false);
+OUTPUT
+noLikes.likes
+        ^
+Error: likes does not exist in class Post
+new Prims("", 0, 0, 0, 0, 0, noLikes.likes, 'a', false);
+                                     ^
+Error: likes does not exist in class Post
+Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
+
+NAME
+dereference success
+INPUT
+Post derefPost = new Post("Postmates", new User("delivery_driver", 68208680101135, null, null));
+derefPost.owner.bestFriend = derefPost.owner;
+derefPost.owner.bestFriend.bestFriend.bestFriend.bestFriend.username
+OUTPUT
+"delivery_driver"
+
+NAME
+deference display char and String correctly
+INPUT
+Prims derefPrims = new Prims("This is a string", 0, 0, 0, 0, 0, 0, 'c', false);
+derefPrims.s
+derefPrims.c
+OUTPUT
+"This is a string"
+'c'
+
+NAME
+parse type success on ids
+INPUT
+String param1 = "String";
+byte param2 = -127;
+char param3;
+boolean param4 = true; 
+new Prims(param1, param2, param2, param2, param2, param2, param2, param3, param4);
+OUTPUT
 
