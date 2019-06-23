@@ -459,12 +459,12 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["long", "float", "double"]));
     }
     if ($e === "") return unexpected_token($token, $line);
-    // TODO: could we move some or all literals to the above switch?
     switch($token["type"]) {
     case TokenType::INT_LITERAL:
         $int_val = (int)$token["value"];
         if ($e === "float") {
-            if (doubleval($token["value"]) <= $_GLOBALS["FLOAT_MAX"] && doubleval($token["value"] >= -$GLOBALS["FLOAT_MAN"]))
+            if (doubleval($token["value"]) <= $_GLOBALS["FLOAT_MAX"]
+                && doubleval($token["value"] >= -$GLOBALS["FLOAT_MAX"]))
                 return shape("value" => floatval($token["value"]), "type" => $e);
             return carrot_and_error("int literal is too large for type float", $line, $token["char_num"]);
         }
@@ -475,12 +475,14 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         }
         if ($_GLOBALS["INT_MAX"]->containsKey($e)) {
             $max = $_GLOBALS["INT_MAX"][$e];
-            // TODO: Does this work for longs?
-            if ($int_val > $max || -$int_val > $max + 1)
-                return carrot_and_error("integer value " . $int_val .
-                " is too large for type " . $e, $line, $token["char_num"]); 
-            // TODO: intval truncates on e instead of supporting scientific notation
-            return shape("value" => intval($token["value"]), "type" => $e);
+            $too_long = false;
+            if ($e === "long") {
+                if ($int_val === $max && int_trim_zeros($token["value"]) !== "" . $max) $too_long = true;
+                else if (-$int_val === $max + 1 && int_trim_zeros($token["value"]) !== "" . (-$max - 1)) $too_long = true;
+            } else if ($int_val > $max || -$int_val > $max + 1) $too_long = true;
+            return $too_long ? carrot_and_error("integer value " . $token["value"] .
+                " is too large for type " . $e, $line, $token["char_num"]) 
+                : shape("value" => intval($token["value"]), "type" => $e);
         }
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::FLOAT_LITERAL:

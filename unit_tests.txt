@@ -448,7 +448,7 @@ OUTPUT
 NAME
 parse type fail on ids
 INPUT
-long longID = 15016801680608708108780
+long longID = 150168016806
 float floatID = 44.4;
 Post postID = new Post("Washington Post", null);
 new Prims("", longID
@@ -490,6 +490,8 @@ float tooLarge1 = 3.5e900;
 float tooLarge2 = -3.5e200;
 float tooLarge3 = 3e500;
 double tooLarge4 = -3e500000;
+long tooLarge5 = 9223372036854775808;
+long notTooLarge = -9223372036854775808;
 double tooNull = null;
 OUTPUT
 new Prims('a'
@@ -524,6 +526,9 @@ Error: int literal is too large for type float
 double tooLarge4 = -3e500000;
                    ^
 Error: int literal is too large for type double
+long tooLarge5 = 9223372036854775808;
+                 ^
+Error: integer value 9223372036854775808 is too large for type long
 double tooNull = null;
                  ^
 Error: expected double but found "null"
