@@ -388,16 +388,16 @@ Error: expected String but found int
 Post constructor expects the following parameters: (String content, User owner)
 
 NAME
-newsted new statement success
+nested new statement success
 INPUT
-Post nesty = new Post("post graduate", new User("Tom Heatwole, PHD", 1743579084573, new User("My number 1 boy", 7072082708, null, null), new Prims("", 0, 0, 0, 0, 0, 0, 'a', false)));
+Post nesty = new Post("post graduate", new User("Tom Heatwole, PHD", 1743579084573, new User("My number 1 boy", 7072082708, null, null), new Prims("", 0, 0, 0, 0, 0, 0, '\"', false)));
 nesty
 nesty.owner.bestFriend.username
 nesty.owner.data.c
 OUTPUT
 Post@#
 "My number 1 boy"
-'a'
+'"'
 
 NAME
 dereference fail when variable does not exist
@@ -572,11 +572,96 @@ Error: unexpected token: 18
 NAME
 must match unexpected
 INPUT
-float f 18.5;
+float mustMatch 18.5;
 OUTPUT
-float f 18.5;
-        ^
+float mustMatch 18.5;
+                ^
 Error: unexpected token: 18.5
 
 NAME
+lexer skips whitespace
+INPUT
+        new   Post      ("Post-it note"  , null)    ;          
+OUTPUT
 
+NAME
+lexer ignores inline comment
+INPUT
+String inline = ""; // this is an inline comment
+OUTPUT
+
+NAME
+lexer catches invalid strings and chars
+INPUT
+nothing needs to make sense on this line "let's start a literal
+nothing makes sense to test lexer ''
+'\z'
+'hellow friends'
+'
+'\
+OUTPUT
+nothing needs to make sense on this line "let's start a literal
+                                         ^
+Error: unclosed quotation
+nothing makes sense to test lexer ''
+                                  ^
+Error: empty char literal
+'\z'
+^
+Error: invalid char literal
+'hellow friends'
+^
+Error: invalid char literal
+'
+^
+Error: unclosed char literal
+'\
+^
+Error: unclosed char literal
+
+NAME
+lexer fails on underscored identifier
+INPUT
+String _stringName;
+OUTPUT
+String _stringName;
+       ^
+Error: JavaQL identifiers may not begin with an underscore
+
+NAME
+lexer fails on unrecognized symbols
+INPUT
+/z
+/@
+@
+OUTPUT
+/z
+^
+Error: unrecognized symbol: /
+/@
+^
+Error: unrecognized symbol: /
+@
+^
+Error: unrecognized symbol: @
+
+NAME
+lexer fails on malformed numbers
+INPUT
+--4
+-4.4.4
+3e-4.5
+6e
+OUTPUT
+--4
+^
+Error: unrecognized symbol: -
+-4.4.4
+^
+Error: malformed number
+3e-4.5
+^
+Error: malformed number
+6e
+^
+Error: malformed number

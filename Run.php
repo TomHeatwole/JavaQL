@@ -737,7 +737,7 @@ function lex_line(dict $_GLOBALS, vec $ret, string $line, int $line_num, boolean
                         "type" => TokenType::STRING_LITERAL,
                         "value" => substr($line, $start, $i - $start + 1),
                         "char_num" => $start,
-                         "line_num" => $line_num
+                        "line_num" => $line_num
                     );
                     break;
                 }
@@ -746,7 +746,7 @@ function lex_line(dict $_GLOBALS, vec $ret, string $line, int $line_num, boolean
 
         // Char literal
         } else if ($line[$i] === "'") {
-            if ($i + 1 === strlen($line)) return carrot_and_error("unclosed char literal", $line, $start);
+            if ($i + 1 === strlen($line)) return carrot_and_error("unclosed char literal", $line, $i);
             $start = $i;
             $c = $line[++$i];
             if ($c === "'") return carrot_and_error("empty char literal", $line, $start);
@@ -783,12 +783,12 @@ function lex_line(dict $_GLOBALS, vec $ret, string $line, int $line_num, boolean
 
         // Underscore error
         } else if ($line[$i] === "_") {
-            return carrot_and_error("JavaQL identifiers may not begin with an underscore", $line, $i);
+            return carrot_and_error($_GLOBALS["PROJECT_NAME"] . " identifiers may not begin with an underscore", $line, $i);
 
         // Comments
         } else if ($line[$i] === "/") {
             if ($i + 1 === strlen($line) || ($line[++$i] !== "/" && $line[$i] !== "*"))
-               return carrot_and_error("unrecognized symbol: " . $line[$i], $line, $i);
+               return carrot_and_error("unrecognized symbol: /", $line, $i - 1);
             if ($line[$i] === "/") break; // Rest of line is comment
             $comment = true; // /* comment has begun
 
@@ -831,7 +831,7 @@ function lex_number(string $line, int &$i, bool $decimal) {
             }
             $e = true;
         } else if (!is_numeric($line[$i + 1])) break;
-        if ($invalid) return carrot_and_error("malformed_number", $line, $start);
+        if ($invalid) return carrot_and_error("malformed number", $line, $start);
     }
     return shape(
         "type" => $decimal ? TokenType::FLOAT_LITERAL : TokenType::INT_LITERAL, 
