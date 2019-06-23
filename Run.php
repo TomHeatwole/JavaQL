@@ -193,6 +193,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::L_CURLY))
             return found_location($file_path, $lex[$i]["line_num"]);
         $vars = vec[];
+        $usedNames = new Set();
         while ($lex[++$i]["type"] !== TokenType::R_CURLY) {
             if (!$_GLOBALS["JAVA_TYPES"]->containsKey($lex[$i]["type"]) && $lex[$i]["value"] !== $class_name) {
                 unexpected_token($lex[$i], $file_vec[$lex[$i]["line_num"]]);
@@ -202,11 +203,16 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             if (!$_GLOBALS["ALL_IDS"]->contains($lex[++$i]["type"]))
                 return unexpected_token($lex[$i], $file_vec[$lex[$i]["line_num"]]);
             $name = $lex[$i]["value"];
+            if ($usedNames->contains($name)) {
+                carrot_and_error("variable " . $name . " is defined twice",
+                    $file_vec[$lex[$i]["line_num"]], $lex[$i]["char_num"]);
+                return found_location($file_path, $lex[$i]["line_num"]);
+            }
+            $usedNames->add($name);
             // TODO: Right here is where we'd allow a default option ex. int i = 5;
             if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::SEMI))
                 return found_location($file_path, $lex[$i]["line_num"]);
             $vars[] = shape("type" => $type, "name" => $name);
-            // TODO: Make sure two variables aren't called the same thing
         }
         if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::EOF))
             return found_location($file_path, $lex[$i]["line_num"]);
