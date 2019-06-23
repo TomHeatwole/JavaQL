@@ -12,3 +12,5 @@ unit_test_barrier.txt
 classes/
 a.out
 State.class
+ParseUnitTests.java
+EvaluateUnitTests.java
