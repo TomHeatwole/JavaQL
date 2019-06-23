@@ -482,8 +482,15 @@ parse type fail on literals
 INPUT
 new Prims('a'
 new Prims("", 0, 0, 0, 0, 999999999999999999999999999999999999999999999999, 0, 'a', false);
-new Prims("", 0, 0, 0, 0, 0, 99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999, 'a', false);
+new Prims("", 0, 0, 0, 0, 0, -99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999, 'a', false);
+new Prims("", 128, 0, 0, 0, 0, 0, 'a', false);
+new Prims("", 0, 0, -2200000000, 0, 0, 0, 'a', false);
 new Prims("", 0, 0, 0, 0, 0, 0, 'a', false);
+float tooLarge1 = 3.5e900;
+float tooLarge2 = -3.5e200;
+float tooLarge3 = 3e500;
+double tooLarge4 = -3e500000;
+double tooNull = null;
 OUTPUT
 new Prims('a'
           ^
@@ -493,8 +500,83 @@ new Prims("", 0, 0, 0, 0, 999999999999999999999999999999999999999999999999, 0, '
                           ^
 Error: int literal is too large for type float
 Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
-new Prims("", 0, 0, 0, 0, 0, 99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999, 'a', false);
+new Prims("", 0, 0, 0, 0, 0, -99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999, 'a', false);
                              ^
 Error: int literal is too large for type double
 Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
+new Prims("", 128, 0, 0, 0, 0, 0, 'a', false);
+              ^
+Error: integer value 128 is too large for type byte
+Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
+new Prims("", 0, 0, -2200000000, 0, 0, 0, 'a', false);
+                    ^
+Error: integer value -2200000000 is too large for type int
+Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
+float tooLarge1 = 3.5e900;
+                  ^
+Error: decimal literal is too large
+float tooLarge2 = -3.5e200;
+                  ^
+Error: decimal literal is too large for type float
+float tooLarge3 = 3e500;
+                  ^
+Error: int literal is too large for type float
+double tooLarge4 = -3e500000;
+                   ^
+Error: int literal is too large for type double
+double tooNull = null;
+                 ^
+Error: expected double but found "null"
+
+NAME
+get display value
+INPUT
+double display1 = -3.5e-300
+double display2 = -3e+300
+double display3;
+boolean display4;
+Post display5;
+display1
+display2
+display3
+display4
+display5
+OUTPUT
+-3.5E-300
+-3.0E300
+0.0
+false
+null
+
+NAME
+right paren and semi fail
+INPUT
+getALlDesc(
+getAllDesc(18);
+getAllDesc()18;
+getAllDesc();18
+OUTPUT
+getALlDesc(
+^
+Error: unexpected token: getALlDesc
+getAllDesc(18);
+           ^
+Error: expected ) but found int
+getAllDesc()18;
+            ^
+Error: unexpected token: 18
+getAllDesc();18
+             ^
+Error: unexpected token: 18
+
+NAME
+must match unexpected
+INPUT
+float f 18.5;
+OUTPUT
+float f 18.5;
+        ^
+Error: unexpected token: 18.5
+
+NAME
 

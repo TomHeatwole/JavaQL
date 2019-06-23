@@ -215,7 +215,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             $query = "CREATE TABLE " . $class_name . " (_id int NOT NULL AUTO_INCREMENT";
             foreach ($vars as $var) {
                 $var_map[$var["name"]] = $var["type"];
-                $sql_column = get_column($_GLOBALS, $var["type"], $var["name"]);
+                $sql_column = get_sql_column($_GLOBALS, $var["type"], $var["name"]);
                 $query .= ", " . $sql_column["name"] . " " . $sql_column["type"];
             }
             if (!mysqli_query($_GLOBALS["conn"], $query . ", PRIMARY KEY(_id))"))
@@ -458,11 +458,13 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     case TokenType::INT_LITERAL:
         $int_val = (int)$token["value"];
         if ($e === "float") {
-            if (doubleval($token["value"]) <= $_GLOBALS["FLOAT_MAX"]) return shape("value" => floatval($token["value"]), "type" => $e);
+            if (doubleval($token["value"]) <= $_GLOBALS["FLOAT_MAX"] && doubleval($token["value"] >= -$GLOBALS["FLOAT_MAN"]))
+                return shape("value" => floatval($token["value"]), "type" => $e);
             return carrot_and_error("int literal is too large for type float", $line, $token["char_num"]);
         }
         if ($e === "double") {
-            if ((double)$token["value"] !== INF) return shape("value" => doubleval($token["value"]), "type" => $e);
+            if ((double)$token["value"] !== INF && (double)$token["value"] !== -INF)
+                return shape("value" => doubleval($token["value"]), "type" => $e);
             return carrot_and_error("int literal is too large for type double", $line, $token["char_num"]);
         }
         if ($_GLOBALS["INT_MAX"]->containsKey($e)) {
@@ -477,10 +479,10 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::FLOAT_LITERAL:
         $double_val = doubleval($token["value"]);
-        if ($double_val === INF)
+        if ($double_val === INF || $double_val === -INF)
             return carrot_and_error("decimal literal is too large", $line, $token["char_num"]);
         if ($e === "float") {
-            if ($float_val > $_GLOBALS["FLOAT_MAX"])
+            if ($double_val > $_GLOBALS["FLOAT_MAX"] || $double_val < -$_GLOBALS["FLOAT_MAX"])
                 return carrot_and_error("decimal literal is too large for type float", $line, $token["char_num"]);
             return shape("value" => floatval($token["value"]), "type" => $e);
         }
@@ -571,6 +573,7 @@ function must_match(dict $_GLOBALS, vec $lex, int $i, string $line, TokenType $e
     return $lex[$i]["value"];
 }
 
+// Same as must match function with unexpected token error message instead of expected but found
 function must_match_unexpected(vec $lex, int $i, string $line, TokenType $e) {
     if ($lex[$i]["type"] !== $e)
         return unexpected_token($lex[$i], $line);
@@ -607,7 +610,7 @@ function check_end(vec $lex, int $i, string $line): int {
     return 0;
 }
 
-function get_column(dict $_GLOBALS, string $type, string $name): shape("type" => string, "name" => string) {
+function get_sql_column(dict $_GLOBALS, string $type, string $name): shape("type" => string, "name" => string) {
     return $_GLOBALS["PRIM"]->contains($type)
         ? shape("type" => $_GLOBALS["TO_SQL_TYPE_MAP"][$type], "name" => $name)
         : shape("type" => "int", "name" => java_ref_to_mysql($type, $name));
@@ -650,7 +653,7 @@ function found_location($file_path, $line_num): boolean {
     return false;
 }
 
-// Doesn't seem like there's a way to dot this better than O(n);
+// Doesn't seem like there's a way to do this better than O(n);
 function map_replace(Map $old_map, string $old_key, string $new_key): Map {
     $new_map = new Map();
     foreach ($old_map->toKeysArray() as $key) {
