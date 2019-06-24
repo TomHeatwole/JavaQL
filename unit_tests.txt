@@ -669,4 +669,4 @@ Error: malformed number
 Error: malformed number
 6e
 ^
-rror: malformed number
+Error: malformed number
