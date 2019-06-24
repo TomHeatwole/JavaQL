@@ -29,47 +29,36 @@ enum TokenType: int {
     CLASS_ID = 17;
     CHAR_ID = 18;
     OBJ_ID = 19;
-    J_SHORT = 20;
-    J_BYTE = 21;
-    J_INT = 22;
-    J_LONG = 23;
-    J_FLOAT = 24;
-    J_DOUBLE = 25;
-    J_CHAR = 26;
-    J_BOOLEAN = 27;
-    J_STRING = 28;
-    LT = 29;
-    GT = 30;
-    LTE = 31;
-    GTE = 32;
-    ASSIGN = 33;
-    EQUAL = 34;
-    AND_OP = 35;
-    OR_OP = 36;
-    L_PAREN = 37;
-    R_PAREN = 38;
-    L_BRACKIE = 39;
-    R_BRACKIE = 40;
-    L_CURLY = 41;
-    R_CURLY = 42;
-    SEMI = 43;
-    DOT = 44;
-    COMMA = 45;
-    EOL = 46;
-    EOF = 47;
-    M_GET_ALL_DESC = 48;
-    M_GET_CLASS_NAMES = 49;
-    M_GET_DESC = 50;
-    M_GET_ALL_OBJECTS = 51;
-    M_GET_OBJECTS = 52;
-    M_BUILD = 53;
-    M_BUILD_ALL = 54;
-    M_RENAME = 55;
-    M_GET_LOCAL_VARIABLES = 56;
-    M_GET_VARIABLES = 57;
-    M_GET_VARIABLES_RECURSIVE = 58;
-    M_DELETE_ALL_OBJECTS = 59;
-    M_DELETE_CLASS = 60;
+    LIST_ID = 20;
+    LT = 21;
+    GT = 22;
+    LTE = 23;
+    GTE = 24;
+    ASSIGN = 25;
+    EQUAL = 26;
+    AND_OP = 27;
+    OR_OP = 28;
+    L_PAREN = 29;
+    R_PAREN = 30;
+    L_BRACKIE = 31;
+    R_BRACKIE = 32;
+    L_CURLY = 33;
+    R_CURLY = 34;
+    SEMI = 35;
+    DOT = 36;
+    COMMA = 37;
+    EOL = 38;
+    EOF = 39;
+    M_GET_ALL_DESC = 40;
+    M_GET_CLASS_NAMES = 41;
+    M_GET_DESC = 42;
+    M_GET_ALL_OBJECTS = 43;
+    M_GET_OBJECTS = 44;
+    M_BUILD = 45;
+    M_BUILD_ALL = 46;
+    M_RENAME = 47;
+    M_GET_LOCAL_VARIABLES = 48;
+    M_GET_VARIABLES = 49;
 }
 
 $_GLOBALS = dict[
@@ -122,15 +111,7 @@ $_GLOBALS = dict[
         TokenType::STRING_ID => "String variable",
         TokenType::CHAR_ID => "char variable",
         TokenType::OBJ_ID => "Object variable",
-        TokenType::J_BYTE => "type name",
-        TokenType::J_SHORT => "type name",
-        TokenType::J_INT => "type name",
-        TokenType::J_LONG => "type name",
-        TokenType::J_FLOAT => "type name",
-        TokenType::J_DOUBLE => "type name",
-        TokenType::J_BOOLEAN => "type name",
-        TokenType::J_STRING => "type name",
-        TokenType::J_CHAR => "type name",
+        TokenType::LIST_ID => "List variable",
         TokenType::EOF => "end of file",
         TokenType::EOL => "end of line",
         TokenType::LT => "<",
@@ -196,6 +177,7 @@ $_GLOBALS = dict[
         TokenType::LONG_ID,
         TokenType::CHAR_ID,
         TokenType::OBJ_ID,
+        TokenType::LIST_ID,
     ]),
     "ALL_IDS" => new Set(vec[
         TokenType::FLOAT_ID,
@@ -208,6 +190,7 @@ $_GLOBALS = dict[
         TokenType::LONG_ID,
         TokenType::CHAR_ID,
         TokenType::OBJ_ID,
+        TokenType::LIST_ID,
         TokenType::CLASS_ID,
         TokenType::ID,
     ]),
