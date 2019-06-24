@@ -188,7 +188,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!must_match_f($_GLOBALS, $lex, $i, $file_vec, TokenType::CLASS_LITERAL))
             return found_location($file_path, $lex[$i]["line_num"]);
         if ($lex[++$i]["value"] !== $class_name) {
-            expected_but_found_literal($lex[$i], $line, $class_name);
+            expected_but_found_literal($lex[$i], $file_vec[$lex[$i]["line_num"]], $class_name);
             return found_location($file_path, $lex[$i]["line_num"]);
         }
         if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::L_CURLY))
