@@ -32,6 +32,7 @@ echo "Loading classes...\n";
 $class_map = dict[];
 $result = mysqli_query($_GLOBALS["conn"], "show tables");
 while ($row = mysqli_fetch_row($result)) {
+    if ($row[0][0] === "_") continue;
     $class = mysqli_query($_GLOBALS["conn"], "describe " . $row[0]);
     $vars = dict[];
     while ($var = mysqli_fetch_assoc($class)) {
