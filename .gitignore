@@ -9,7 +9,6 @@ test_outputs.txt
 test_names.txt
 test_expected_outputs.txt
 unit_test_barrier.txt
-classes/
 a.out
 State.class
 ParseUnitTests.java

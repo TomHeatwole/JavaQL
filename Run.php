@@ -126,7 +126,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
     case TokenType::M_GET_VARIABLES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         $i++;
-        if (!$param = parse_type($_GLOBALS, $lex, &$i, $line, "")) return false;
+        if (!$param = parse_type($_GLOBALS, $lex, &$i, $line, "", false)) return false;
         if ($param["value"] === null)
             return carrot_and_error("getVariables() expects non-null parameter", $line, $lex[$i - 1]["char_num"]);
         if ($_GLOBALS["PRIM"]->contains($param["type"]))
@@ -176,7 +176,8 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             . $class_name . ": " . implode(", ", $ruined_classes));
         $confirm = readline("Are you sure you want remove class " . $class_name . " and delete all of its objects? (y/n) ");
         if ($confirm !== "y" && $confirm !== "yes") return false;
-        mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $class_name);
+        // TODO: delete all existing lists of this type before running the query below;
+        if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $class_name)) return error($_GLOBALS["MYSQL_ERROR"]);
         $_GLOBALS["class_map"]->remove($class_name);
         return true;
     case TokenType::M_BUILD:
@@ -206,8 +207,10 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 unexpected_token($lex[$i], $file_vec[$lex[$i]["line_num"]]);
                 return found_location($file_path, $lex[$i]["line_num"]);
             }
-            $type = $lex[$i]["value"];
-            if (!$_GLOBALS["ALL_IDS"]->contains($lex[++$i]["type"]))
+            $type = $lex[$i++]["value"];
+            $subtype = ($type === "List") ? parse_list_generic($_GLOBALS, $lex, &$i, $line) : null;
+            if ($subtype === false) return false;
+            if (!$_GLOBALS["ALL_IDS"]->contains($lex[$i]["type"]))
                 return unexpected_token($lex[$i], $file_vec[$lex[$i]["line_num"]]);
             $name = $lex[$i]["value"];
             if ($usedNames->contains($name)) {
@@ -219,7 +222,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             // TODO: Right here is where we'd allow a default option ex. int i = 5;
             if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::SEMI))
                 return found_location($file_path, $lex[$i]["line_num"]);
-            $vars[] = shape("type" => $type, "name" => $name);
+            $vars[] = shape("type" => $type, "subtype" => $subtype, "name" => $name);
         }
         if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::EOF))
             return found_location($file_path, $lex[$i]["line_num"]);
@@ -231,8 +234,9 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 $sql_column = get_sql_column($_GLOBALS, $var["type"], $var["name"]);
                 $query .= ", " . $sql_column["name"] . " " . $sql_column["type"];
             }
-            if (!mysqli_query($_GLOBALS["conn"], $query . ", PRIMARY KEY(_id))"))
+            if (!mysqli_query($_GLOBALS["conn"], $query . ", PRIMARY KEY(_id))")) {
                 return error($_GLOBALS["MYSQL_ERROR"]);
+            }
             $_GLOBALS["class_map"][$class_name] = new Map($var_map);
             return true;
         }
@@ -264,7 +268,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         }
         if (!must_match_unexpected($lex, $i, $line, TokenType::COMMA)) return false;
         $i++;
-        if (!($new_name = parse_type($_GLOBALS, $lex, &$i, $line, "String"))) return false;
+        if (!($new_name = parse_type($_GLOBALS, $lex, &$i, $line, "String", false))) return false;
         $new_name = remove_quotes($new_name["value"]);
         if (strlen($new_name) === 0) return error("cannot rename variable to empty string");
         if ($is_class) {
@@ -306,7 +310,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         // TODO: Edit file to reflect change?
         return true;
     case TokenType::NEW_LITERAL:
-        if (!new_object($_GLOBALS, $lex, &$i, $line, "")) return false;
+        if (!new_object($_GLOBALS, $lex, &$i, $line, "", false)) return false;
         return must_end($lex, $i, $line);
     case TokenType::ID:
         // This line must exist for unit tests to run correctly
@@ -341,7 +345,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 return success(get_display_val($_GLOBALS, $d["type"], $d["value"]));
             }
             if (!must_match_unexpected($lex, $i++, $line, TokenType::ASSIGN)) return false;
-            if (!($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"]))) return false;
+            if (!($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"], true))) return false;
             else if (!must_end($lex, $i, $line)) return false;
             $set_val = $set_val["value"];
             $query = "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=";
@@ -363,13 +367,12 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
 }
 
 // return false or type & value of new object
-function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) {
+function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e, bool $ref) {
     $class_map = $_GLOBALS["class_map"];
     if ($lex[$i]["type"] === TokenType::J_LIST) {
         if ($e !== "" && $e !== "List") return expected_but_found_literal($lex[$i], $line, "List");
         $i++;
-        // TODO: figure out how to pass valid ref count
-        return new_list($_GLOBALS, $lex, &$i, $line, 0);
+        return new_list($_GLOBALS, $lex, &$i, $line, (int)$ref);
     }
     if (!($class_name = must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return false;
     if ($e !== "" && $e !== $class_name)
@@ -379,7 +382,7 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     $var_values = vec[];
     $i++;
     for ($j = 0; $j < count($var_types); $j++) {
-        if (!($var_val = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j]))) {
+        if (!($var_val = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j], true))) {
             echo $class_name, " constructor expects the following parameters: (";
             $var_names = $class_map[$class_name]->toKeysArray();
             for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
@@ -406,12 +409,9 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
 }
 
 function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line, int $ref_count) {
-    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::LT)) return false;
-    if (!$_GLOBALS["JAVA_TYPES"]->containsKey($lex[$i]["type"])) return expected_but_found($lex[$i], $line, "type");
-    $subtype = $lex[$i++]["value"];
-    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::GT)) return false;
-    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
+    if (!($subtype = parse_list_generic($_GLOBALS, $lex, &$i, $line))) return false;
     // TODO: copy constructor
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
     $size = 0;
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
     // TODO: consider adding what list constructor expects ??
@@ -428,8 +428,17 @@ function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line, int $ref_coun
     return shape(
         "type" => "List",
         "subtype" => $subtype,
-        "value" => new QueryResult(count($_GLOBALS["query_queue"] - 1))
+        "value" => new QueryResult(count($_GLOBALS["query_queue"]) - 1)
     );
+}
+
+function parse_list_generic(dict $_GLOBALS, vec $lex, int &$i, string $line) {
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::LT)) return false;
+    if (!$_GLOBALS["JAVA_TYPES"]->containsKey($lex[$i]["type"]))
+        return expected_but_found($_GLOBALS, $lex[$i], $line, "type");
+    $generic = $lex[$i++]["value"];
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::GT)) return false;
+    return $generic;
 }
 
 function get_new_list_table_name(dict $_GLOBALS) : string {
@@ -443,7 +452,7 @@ function get_new_list_table_name(dict $_GLOBALS) : string {
 }
 
 function assign(dict $_GLOBALS, vec $lex, int $i, string $e, string $line, string $name): boolean {
-    if (!($val = parse_type($_GLOBALS, $lex, &$i, $line, $e))) return false;
+    if (!($val = parse_type($_GLOBALS, $lex, &$i, $line, $e, false))) return false;
     $val = $val["value"];
     if (!must_end($lex, $i, $line)) return false;
     if ($val instanceof QueryResult) {
@@ -479,12 +488,12 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
 }
 
 // return sym if parsed correctly or false otherwise
-function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) {
+function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e, bool $ref) {
     // TODO: Implement default
     $token = $lex[$i++];
     switch($token["type"]) {
     case TokenType::NEW_LITERAL:
-        return ($val = new_object($_GLOBALS, $lex, &$i, $line, $e)) ? $val : false;
+        return ($val = new_object($_GLOBALS, $lex, &$i, $line, $e, $ref)) ? $val : false;
     case TokenType::OBJ_ID:
         $sym = $_GLOBALS["symbol_table"][$token["value"]];
         if ($lex[$i]["type"] === TokenType::DOT) {
