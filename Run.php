@@ -47,10 +47,16 @@ while ($row = mysqli_fetch_row($result)) {
     }
     $class_map[$row[0]] = new Map($vars);
 }
+
+// Load lists
+$list_table_names = vec[];
+// TODO: load lists
+
 echo "Classes loaded\n\n";
 
-$_GLOBALS["conn"] = $_GLOBALS["conn"];
+
 $_GLOBALS["class_map"] = new Map($class_map);
+$_GLOBALS["list_table_names"] = new Map($list_table_names);
 $_GLOBALS["symbol_table"] = new Map();
 
 // Begin CLI 
@@ -227,7 +233,6 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             }
             if (!mysqli_query($_GLOBALS["conn"], $query . ", PRIMARY KEY(_id))"))
                 return error($_GLOBALS["MYSQL_ERROR"]);
-            
             $_GLOBALS["class_map"][$class_name] = new Map($var_map);
             return true;
         }
@@ -357,9 +362,15 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
     return unexpected_token($lex[0], $line);
 }
 
-// return false or value of new object
+// return false or type & value of new object
 function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) {
     $class_map = $_GLOBALS["class_map"];
+    if ($lex[$i]["type"] === TokenType::J_LIST) {
+        if ($e !== "" && $e !== "List") return expected_but_found_literal($lex[$i], $line, "List");
+        $i++;
+        // TODO: figure out how to pass valid ref count
+        return new_list($_GLOBALS, $lex, &$i, $line, 0);
+    }
     if (!($class_name = must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return false;
     if ($e !== "" && $e !== $class_name)
         return expected_but_found_literal($lex[$i], $line, $e);
@@ -394,8 +405,41 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e) 
     return shape("value" => $qr, "type" => $class_name);
 }
 
+function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line, int $ref_count) {
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::LT)) return false;
+    if (!$_GLOBALS["JAVA_TYPES"]->containsKey($lex[$i]["type"])) return expected_but_found($lex[$i], $line, "type");
+    $subtype = $lex[$i++]["value"];
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::GT)) return false;
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
+    // TODO: copy constructor
+    $size = 0;
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
+    // TODO: consider adding what list constructor expects ??
+    $table_name = get_new_list_table_name($_GLOBALS);
+    $sql_type = $_GLOBALS["PRIM"]->contains($subtype) ? $_GLOBALS["TO_SQL_TYPE_MAP"][$subtype] : "int";
+    $_GLOBALS["query_queue"][] = vec["CREATE TABLE " . $table_name . " (value " . $sql_type . ")"];
+    $insert_values = vec["default", add_quotes($subtype), $size, $ref_count, add_quotes($table_name)];
+    $_GLOBALS["query_queue"][] = vec["INSERT INTO _list VALUES (" . implode(", ", $insert_values) . " )"];
+    $_GLOBALS["query_queue"][] = vec["SELECT LAST_INSERT_ID()"];
+    return shape(
+        "type" => "List",
+        "subtype" => $subtype,
+        "value" => new QueryResult(count($_GLOBALS["query_queue"] - 1))
+    );
+}
+
+function get_new_list_table_name(dict $_GLOBALS) : string {
+    $alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    for (;;) {
+        $table_name_vec = vec["_"];
+        for ($i = 0; $i < 20; $i++) $table_name_vec[] = $alpha[rand(0,51)];
+        $table_name = implode($table_name_vec);
+        if (!$_GLOBALS["list_table_names"]->contains($table_name)) return $table_name;
+    }
+}
+
 function assign(dict $_GLOBALS, vec $lex, int $i, string $e, string $line, string $name): boolean {
-    if (($val = parse_type($_GLOBALS, $lex, &$i, $line, $e)) === false) return false;
+    if (!($val = parse_type($_GLOBALS, $lex, &$i, $line, $e))) return false;
     $val = $val["value"];
     if (!must_end($lex, $i, $line)) return false;
     if ($val instanceof QueryResult) {
@@ -423,7 +467,7 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
         $parent = shape("type" => $type, "value" => $value);
         $value = mysqli_fetch_row($result)[0];
         $type = $class_var_type;
-        if ($type === "String") $value = "\"" . $value . "\"";
+        if ($type === "String") $value = add_quotes($value);
         else if ($type === "char") $value = "'" . $value . "'";
         if ($lex[++$i]["type"] !== TokenType::DOT || $is_primitive) break;
     }
@@ -560,8 +604,12 @@ function get_display_val(dict $_GLOBALS, string $type, $val) {
     return $val;
 }
 
-function remove_quotes(string $val) {
+function remove_quotes(string $val) : string {
     return substr($val, 1, strlen($val) - 2);
+}
+
+function add_quotes(string $val) : string {
+    return "\"" . $val . "\"";
 }
 
 function r_paren_semi(dict $_GLOBALS, $lex, int $i, string $line): boolean {
@@ -594,7 +642,8 @@ function unexpected_token($token, string $line): boolean {
 }
 
 function expected_but_found_literal($token, string $line, string $e): boolean {
-    return carrot_and_error("expected \"" . $e . "\" but found \"". $token["value"] . "\"", $line, $token["char_num"]);
+    return carrot_and_error("expected " . add_quotes($e) . " but found "
+        . add_quotes($token["value"]), $line, $token["char_num"]);
 }
 
 function expected_but_found(dict $_GLOBALS, $token, string $line, string $e): boolean {
