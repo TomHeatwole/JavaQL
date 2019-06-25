@@ -76,6 +76,7 @@ for (;;) {
             if (is_int($query_pieces[$j])) $query_pieces[$j] = mysqli_fetch_row($query_results[$query_pieces[$j]])[0];
         if (!$result = mysqli_query($_GLOBALS["conn"], implode($query_pieces))) {
             error($_GLOBALS["MYSQL_ERROR"]);
+            echo implode($query_pieces), "\n";
             $quit = true;
         }
         if ($quit) break;
@@ -108,7 +109,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
-        return success(json_encode($class_map[$class_name], JSON_PRETTY_PRINT));
+        return success(json_encode(map_replace_list_types($class_map[$class_name]), JSON_PRETTY_PRINT));
     case TokenType::M_GET_CLASS_NAMES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
@@ -208,8 +209,10 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
                 return found_location($file_path, $lex[$i]["line_num"]);
             }
             $type = $lex[$i++]["value"];
-            $subtype = ($type === "List") ? parse_list_generic($_GLOBALS, $lex, &$i, $line) : null;
-            if ($subtype === false) return false;
+            if ($type === "List") {
+                if (!($subtype = parse_list_subtype($_GLOBALS, $lex, &$i, "", $line))) return false;
+                $type = new ListType($subtype, 0);
+            }
             if (!$_GLOBALS["ALL_IDS"]->contains($lex[$i]["type"]))
                 return unexpected_token($lex[$i], $file_vec[$lex[$i]["line_num"]]);
             $name = $lex[$i]["value"];
@@ -222,7 +225,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             // TODO: Right here is where we'd allow a default option ex. int i = 5;
             if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::SEMI))
                 return found_location($file_path, $lex[$i]["line_num"]);
-            $vars[] = shape("type" => $type, "subtype" => $subtype, "name" => $name);
+            $vars[] = shape("type" => $type, "name" => $name);
         }
         if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::EOF))
             return found_location($file_path, $lex[$i]["line_num"]);
@@ -367,12 +370,12 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
 }
 
 // return false or type & value of new object
-function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e, bool $ref) {
+function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref) {
     $class_map = $_GLOBALS["class_map"];
     if ($lex[$i]["type"] === TokenType::J_LIST) {
-        if ($e !== "" && $e !== "List") return expected_but_found_literal($lex[$i], $line, "List");
+        if (!($e instanceof ListType) && $e !== "") return expected_but_found_literal($lex[$i], $line, "List");
         $i++;
-        return new_list($_GLOBALS, $lex, &$i, $line, (int)$ref);
+        return new_list($_GLOBALS, $lex, &$i, $line, $e, (int)$ref);
     }
     if (!($class_name = must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return false;
     if ($e !== "" && $e !== $class_name)
@@ -408,37 +411,50 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e, 
     return shape("value" => $qr, "type" => $class_name);
 }
 
-function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line, int $ref_count) {
-    if (!($subtype = parse_list_generic($_GLOBALS, $lex, &$i, $line))) return false;
+function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, int $ref_count) {
+    if (!($subtype = parse_list_subtype($_GLOBALS, $lex, &$i, $e, $line))) return false;
     // TODO: copy constructor
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
     $size = 0;
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
     // TODO: consider adding what list constructor expects ??
     $table_name = get_new_list_table_name($_GLOBALS);
-    $sql_type = $_GLOBALS["PRIM"]->contains($subtype) ? $_GLOBALS["TO_SQL_TYPE_MAP"][$subtype] : "int";
+    $subtype_table = $subtype;
+    if ($subtype instanceof ListType) {
+        $subtype_table = "_list";
+        $sql_type = "int";
+    } else $sql_type = $_GLOBALS["PRIM"]->contains($subtype) ? $_GLOBALS["TO_SQL_TYPE_MAP"][$subtype] : "int";
     $query = "CREATE TABLE " . $table_name . " (value " . $sql_type;
     $query .= ($sql_type === "int")
-        ? ", FOREIGN KEY (value) REFERENCES " . $subtype . "(_id) ON DELETE SET NULL)"
+        ? ", FOREIGN KEY (value) REFERENCES " . $subtype_table . "(_id) ON DELETE SET NULL)"
         : ")";
     $_GLOBALS["query_queue"][] = vec[$query];
-    $insert_values = vec["default", add_quotes($subtype), $size, $ref_count, add_quotes($table_name)];
+    $insert_values = vec["default", list_subtype_to_sql($subtype), $size, $ref_count, add_quotes($table_name)];
     $_GLOBALS["query_queue"][] = vec["INSERT INTO _list VALUES (" . implode(", ", $insert_values) . " )"];
     $_GLOBALS["query_queue"][] = vec["SELECT LAST_INSERT_ID()"];
     return shape(
-        "type" => "List",
-        "subtype" => $subtype,
+        "type" => new ListType($subtype, 0),
         "value" => new QueryResult(count($_GLOBALS["query_queue"]) - 1)
     );
 }
 
-function parse_list_generic(dict $_GLOBALS, vec $lex, int &$i, string $line) {
+function list_subtype_to_sql($subtype): string {
+    return add_quotes($subtype instanceof ListType ? "_L" . $subtype->dim . $subtype->subtype : $subtype);
+}
+
+function parse_list_subtype(dict $_GLOBALS, vec $lex, int &$i, $e, string $line) {
+    if ($e instanceof ListType) $e = $e->inner(); // Allows e to remain ""
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::LT)) return false;
     if (!$_GLOBALS["JAVA_TYPES"]->containsKey($lex[$i]["type"]))
         return expected_but_found($_GLOBALS, $lex[$i], $line, "type");
-    $generic = $lex[$i++]["value"];
+    $subtype = $lex[$i++]["value"];
+    if ($subtype === "List") {
+        if ($e instanceof ListType || $e === "")
+            $subtype = new ListType(parse_list_subtype($_GLOBALS, $lex, &$i, $e, $line), 0);
+        else return expected_but_found($_GLOBALS, $lex[$i - 1], $line, $e);
+    } else if ($subtype !== $e && $e !== "") return expected_but_found($_GLOBALS, $lex[$i - 1], $line, $e);
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::GT)) return false;
-    return $generic;
+    return $subtype;
 }
 
 function get_new_list_table_name(dict $_GLOBALS) : string {
@@ -473,7 +489,7 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
             return carrot_and_error($lex[$i]["value"] .
             " does not exist in class " . $type, $line, $lex[$i]["char_num"]);
         $class_var_type = $_GLOBALS["class_map"][$type][$lex[$i]["value"]];
-        $is_primitive = $_GLOBALS["PRIM"]->contains($class_var_type);
+        $is_primitive = !($class_var_type instanceof ListType) && $_GLOBALS["PRIM"]->contains($class_var_type);
         $row_name =  $is_primitive ? $lex[$i]["value"] : java_ref_to_mysql($class_var_type, $lex[$i]["value"]); 
         $result = mysqli_query($_GLOBALS["conn"], "SELECT " . $row_name . " FROM " . $type . " WHERE _id=" . $value);
         if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
@@ -488,7 +504,7 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
 }
 
 // return sym if parsed correctly or false otherwise
-function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e, bool $ref) {
+function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref) {
     // TODO: Implement default
     $token = $lex[$i++];
     switch($token["type"]) {
@@ -564,9 +580,9 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, string $e, 
         if ($e === "boolean") return shape("value" => $token["value"], "type" => $e);
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::NULL_LITERAL:
-        return $_GLOBALS["PRIM"]->contains($e)
-            ? expected_but_found($_GLOBALS, $token, $line, $e)
-            : shape("value" => null, "type" => $e);
+        return ($e instanceof ListType || !$_GLOBALS["PRIM"]->contains($e))
+            ? shape("value" => null, "type" => $e)
+            : expected_but_found($_GLOBALS, $token, $line, $e);
     default: return expected_but_found($_GLOBALS, $token, $line, $e);
     }
 }
@@ -605,16 +621,21 @@ function single_query_result_to_string(dict $_GLOBALS, $result, string $class_na
     return json_encode($vars, JSON_PRETTY_PRINT);
 }
 
-function get_display_val(dict $_GLOBALS, string $type, $val) {
+function get_display_val(dict $_GLOBALS, $type, $val) {
     if ($type === "boolean") return $val && $val !== "false" ? "true" : "false";
     if ($type === "double" || $type === "float") {
         $val = str_replace("e", "E", $val);
         $val = str_replace("+", "", $val);
         return strpos($val, ".") ? $val : $val .= ".0";
     }
-    if (!$_GLOBALS["PRIM"]->contains($type))
+    if (!is_primitive($_GLOBALS, $type))
         return $val === null ? "null" : $type . "@" . $val;
     return $val;
+}
+
+function is_primitive(dict $_GLOBALS, $type) {
+    if ($type instanceof ListType) return false;
+    return $_GLOBALS["PRIM"]->contains($type);
 }
 
 function remove_quotes(string $val) : string {
@@ -659,7 +680,8 @@ function expected_but_found_literal($token, string $line, string $e): boolean {
         . add_quotes($token["value"]), $line, $token["char_num"]);
 }
 
-function expected_but_found(dict $_GLOBALS, $token, string $line, string $e): boolean {
+function expected_but_found(dict $_GLOBALS, $token, string $line, $e): boolean {
+    if ($e instanceof ListType) $e = "List";
     return carrot_and_error("expected " . $e . " but found " .
         $_GLOBALS["TOKEN_NAME_MAP"][$token["type"]], $line, $token["char_num"]);
 }
@@ -681,13 +703,22 @@ function check_end(vec $lex, int $i, string $line): int {
     return 0;
 }
 
-function get_sql_column(dict $_GLOBALS, string $type, string $name): shape("type" => string, "name" => string) {
-    return $_GLOBALS["PRIM"]->contains($type)
+function get_sql_column(dict $_GLOBALS, $type, string $name): shape("type" => string, "name" => string) {
+    if ($type instanceof ListType) {
+        // List<List<List<Post>>> posts; ==> _L3_4Postposts
+        return shape(
+            "type" => "int", 
+        );
+    }
+    return !($type instanceof ListType) && $_GLOBALS["PRIM"]->contains($type)
         ? shape("type" => $_GLOBALS["TO_SQL_TYPE_MAP"][$type], "name" => $name)
         : shape("type" => "int", "name" => java_ref_to_mysql($type, $name));
 }
 
-function mysql_ref_to_java(string $name): shape("type" => string, "name" => string) {
+function mysql_ref_to_java(string $name) {
+    if ($name[1] === "L") {
+        return mysql_list_to_java($name);
+    }
     $table_name_length = $name[1];
     for ($i = 2; is_numeric($name[$i]); $i++) $table_name_length .= $name[$i];
     return shape(
@@ -696,9 +727,30 @@ function mysql_ref_to_java(string $name): shape("type" => string, "name" => stri
     );
 }
 
-function java_ref_to_mysql(string $type, string $name): string {
-    return "_" . strlen($type) . $type . $name;
+function mysql_list_to_java(string $name) {
+    $list_dim = $name[2];
+    for ($i = 3; $name[$i] !== "_"; $i++) $list_dim .= $name[$i];
+    $name_and_subtype = mysql_ref_to_java(substr($name, 2 + strlen($list_dim)));
+    return shape(
+        "type" => new ListType($name_and_subtype["type"], intval($list_dim)),
+        "name" => $name_and_subtype["name"]
+    );
 }
+
+function list_type_to_java(ListType $l): string {
+    $ret = vec["List<"];
+    for ($i = 1; $i < $l->dim; $i++) $ret[] = "List<";
+    $ret[] = $l->subtype;
+    $ret[] = str_repeat(">", $l->dim);
+    return implode($ret);
+}
+
+function java_ref_to_mysql($type, string $name): string {
+    return ($type instanceof ListType)
+        ? "_L" . $type->dim . "_" . strlen($type->subtype) . $type->subtype . $name 
+        : "_" . strlen($type) . $type . $name;
+}
+
 
 function success($print): boolean {
     echo $print, "\n";
@@ -730,6 +782,16 @@ function map_replace(Map $old_map, string $old_key, string $new_key): Map {
     foreach ($old_map->toKeysArray() as $key) {
         if ($key === $old_key) $new_map[$new_key] = $old_map[$key];
         else $new_map[$key] = $old_map[$key];
+    }
+    return $new_map;
+}
+
+function map_replace_list_types(Map $old_map) {
+    $new_map = new Map();
+    foreach ($old_map->toKeysArray() as $key) {
+        $val = $old_map[$key];
+        if ($val instanceof ListType) $val = list_type_to_java($val);
+        $new_map[$key] = $val;
     }
     return $new_map;
 }

@@ -8,6 +8,34 @@ class QueryResult {
     }
 }
 
+class ListType {
+    public string $subtype;
+    public int $dim;
+
+    public function __construct ($subtype, int $dim) {
+        if ($dim === 0) {
+            if ($subtype instanceof ListType) {
+                $this->dim = $subtype->dim + 1;
+                $this->subtype = $subtype->subtype;
+            } else {
+                $this->dim = 1;
+                $this->subtype = $subtype;
+            }
+        } else {
+            $this->dim = $dim;
+            $this->subtype = $subtype;
+        }
+    }
+
+    public function __toString() {
+        return "List";
+    }
+
+    public function inner() {
+        return $this->dim > 1 ? new ListType($this->subtype, $this->dim - 1) : $this->subtype;
+    }
+}
+
 enum TokenType: int {
     INT_LITERAL = 0;
     FLOAT_LITERAL = 1;
@@ -154,6 +182,16 @@ $_GLOBALS = dict[
         TokenType::M_BUILD => "method name",
         TokenType::M_BUILD_ALL => "method name",
         TokenType::M_RENAME => "method name",
+        TokenType::J_BYTE => "byte",
+        TokenType::J_SHORT => "short",
+        TokenType::J_INT => "int",
+        TokenType::J_LONG => "long",
+        TokenType::J_FLOAT => "float",
+        TokenType::J_DOUBLE => "double",
+        TokenType::J_BOOLEAN => "boolean",
+        TokenType::J_STRING => "String",
+        TokenType::J_CHAR => "char",
+        TokenType::J_LIST => "List",
     ]),
     "JAVA_TYPES" => new Map(dict[
         TokenType::CLASS_ID => "class",
