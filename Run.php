@@ -417,7 +417,11 @@ function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line, int $ref_coun
     // TODO: consider adding what list constructor expects ??
     $table_name = get_new_list_table_name($_GLOBALS);
     $sql_type = $_GLOBALS["PRIM"]->contains($subtype) ? $_GLOBALS["TO_SQL_TYPE_MAP"][$subtype] : "int";
-    $_GLOBALS["query_queue"][] = vec["CREATE TABLE " . $table_name . " (value " . $sql_type . ")"];
+    $query = "CREATE TABLE " . $table_name . " (value " . $sql_type;
+    $query .= ($sql_type === "int")
+        ? ", FOREIGN KEY (value) REFERENCES " . $subtype . "(_id) ON DELETE SET NULL)"
+        : ")";
+    $_GLOBALS["query_queue"][] = vec[$query];
     $insert_values = vec["default", add_quotes($subtype), $size, $ref_count, add_quotes($table_name)];
     $_GLOBALS["query_queue"][] = vec["INSERT INTO _list VALUES (" . implode(", ", $insert_values) . " )"];
     $_GLOBALS["query_queue"][] = vec["SELECT LAST_INSERT_ID()"];
