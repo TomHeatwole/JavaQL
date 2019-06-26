@@ -130,7 +130,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!$param = parse_type($_GLOBALS, $lex, &$i, $line, "", false)) return false;
         if ($param["value"] === null)
             return carrot_and_error("getVariables() expects non-null parameter", $line, $lex[$i - 1]["char_num"]);
-        if ($_GLOBALS["PRIM"]->contains($param["type"]))
+        if (is_primitive($_GLOBALS, $param["type"]))
             return carrot_and_error("getVariables() expects non-primitive parameter", $line, $lex[$i - 1]["char_num"]);
         if (!r_paren_semi($_GLOBALS, $lex, $i, $line)) return false;
         $query = "SELECT * FROM " . $param["type"] . " WHERE _ID=";
@@ -302,7 +302,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         }
         $old_row_name = $var_name;
         $new_row_name = $new_name;
-        if (!$_GLOBALS["PRIM"]->contains($type)) {
+        if (!is_primitive($_GLOBALS, $type)) {
             $old_row_name = java_ref_to_mysql($type, $old_row_name);
             $new_row_name = java_ref_to_mysql($type, $new_row_name);
         }
@@ -489,8 +489,8 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
             return carrot_and_error($lex[$i]["value"] .
             " does not exist in class " . $type, $line, $lex[$i]["char_num"]);
         $class_var_type = $_GLOBALS["class_map"][$type][$lex[$i]["value"]];
-        $is_primitive = !($class_var_type instanceof ListType) && $_GLOBALS["PRIM"]->contains($class_var_type);
-        $row_name =  $is_primitive ? $lex[$i]["value"] : java_ref_to_mysql($class_var_type, $lex[$i]["value"]); 
+        $is_primitive = is_primitive($_GLOBALS, $class_var_type);
+        $row_name = $is_primitive ? $lex[$i]["value"] : java_ref_to_mysql($class_var_type, $lex[$i]["value"]); 
         $result = mysqli_query($_GLOBALS["conn"], "SELECT " . $row_name . " FROM " . $type . " WHERE _id=" . $value);
         if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
         $parent = shape("type" => $type, "value" => $value);
@@ -580,9 +580,9 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $r
         if ($e === "boolean") return shape("value" => $token["value"], "type" => $e);
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::NULL_LITERAL:
-        return ($e instanceof ListType || !$_GLOBALS["PRIM"]->contains($e))
-            ? shape("value" => null, "type" => $e)
-            : expected_but_found($_GLOBALS, $token, $line, $e);
+        return (is_primitive($_GLOBALS, $e))
+            ? expected_but_found($_GLOBALS, $token, $line, $e)
+            : shape("value" => null, "type" => $e);
     default: return expected_but_found($_GLOBALS, $token, $line, $e);
     }
 }
@@ -704,13 +704,7 @@ function check_end(vec $lex, int $i, string $line): int {
 }
 
 function get_sql_column(dict $_GLOBALS, $type, string $name): shape("type" => string, "name" => string) {
-    if ($type instanceof ListType) {
-        // List<List<List<Post>>> posts; ==> _L3_4Postposts
-        return shape(
-            "type" => "int", 
-        );
-    }
-    return !($type instanceof ListType) && $_GLOBALS["PRIM"]->contains($type)
+    return is_primitive($_GLOBALS, $type) 
         ? shape("type" => $_GLOBALS["TO_SQL_TYPE_MAP"][$type], "name" => $name)
         : shape("type" => "int", "name" => java_ref_to_mysql($type, $name));
 }
