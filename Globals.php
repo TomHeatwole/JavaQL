@@ -208,6 +208,7 @@ $_GLOBALS = dict[
     ]),
     "DEFAULTS" => new Map(dict[
         "class" => null,
+        "List" => null,
         "byte" => 0,
         "short" => 0,
         "int" => 0,

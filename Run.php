@@ -321,7 +321,11 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
     }
     if ($_GLOBALS["JAVA_TYPES"]->containsKey($lex[0]["type"])) {
         $j_type = $_GLOBALS["JAVA_TYPES"][$lex[0]["type"]];
-        $e = ($j_type === "class") ? $lex[0]["value"] : $j_type;
+        if ($j_type === "List") {
+            if (!($e = parse_list_subtype($_GLOBALS, $lex, &$i, "", $line))) return false;
+            $e = new ListType($e, 0);
+        }
+        else $e = ($j_type === "class") ? $lex[0]["value"] : $j_type;
         if ($lex[$i]["type"] === TokenType::CLASS_ID)
             return carrot_and_error($_GLOBALS["PROJECT_NAME"] .
             " variables may not share names with classes", $line, $lex[$i]["char_num"]);
@@ -449,9 +453,10 @@ function parse_list_subtype(dict $_GLOBALS, vec $lex, int &$i, $e, string $line)
         return expected_but_found($_GLOBALS, $lex[$i], $line, "type");
     $subtype = $lex[$i++]["value"];
     if ($subtype === "List") {
-        if ($e instanceof ListType || $e === "")
-            $subtype = new ListType(parse_list_subtype($_GLOBALS, $lex, &$i, $e, $line), 0);
-        else return expected_but_found($_GLOBALS, $lex[$i - 1], $line, $e);
+        if ($e instanceof ListType || $e === "") {
+            if (!($subtype = parse_list_subtype($_GLOBALS, $lex, &$i, $e, $line))) return false;
+            $subtype = new ListType($subtype, 0);
+        } else return expected_but_found($_GLOBALS, $lex[$i - 1], $line, $e);
     } else if ($subtype !== $e && $e !== "") return expected_but_found($_GLOBALS, $lex[$i - 1], $line, $e);
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::GT)) return false;
     return $subtype;
@@ -467,7 +472,7 @@ function get_new_list_table_name(dict $_GLOBALS) : string {
     }
 }
 
-function assign(dict $_GLOBALS, vec $lex, int $i, string $e, string $line, string $name): boolean {
+function assign(dict $_GLOBALS, vec $lex, int $i, $e, string $line, string $name): boolean {
     if (!($val = parse_type($_GLOBALS, $lex, &$i, $line, $e, false))) return false;
     $val = $val["value"];
     if (!must_end($lex, $i, $line)) return false;
@@ -844,7 +849,8 @@ function lex_line(dict $_GLOBALS, vec $ret, string $line, int $line_num, boolean
             else if ($_GLOBALS["class_map"]->containsKey($value)) $type = TokenType::CLASS_ID;
             else if ($_GLOBALS["symbol_table"]->containsKey($value)) {
                 $j_type = $_GLOBALS["symbol_table"][$value]["type"];
-                $type = $_GLOBALS["JAVA_TYPE_TO_ID"]->containsKey($j_type) ?
+                if ($j_type instanceof ListType) $type = TokenType::LIST_ID;
+                else $type = $_GLOBALS["JAVA_TYPE_TO_ID"]->containsKey($j_type) ?
                     $_GLOBALS["JAVA_TYPE_TO_ID"][$j_type] :
                     TokenType::OBJ_ID;
             }
