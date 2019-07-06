@@ -44,6 +44,7 @@ INPUT
 getClassNames()
 OUTPUT
 [
+    "Favorites",
     "Post",
     "Prims",
     "User"
@@ -65,6 +66,13 @@ INPUT
 getAllDesc()
 OUTPUT
 {
+    "Favorites": {
+        "posts": "List<Post>",
+        "comments": "List<String>",
+        "tripleList": "List<List<List<int>>>",
+        "triplePrims": "List<List<List<Prims>>>",
+        "owner": "User"
+    },
     "Post": {
         "content": "String",
         "owner": "User"
@@ -148,7 +156,7 @@ OUTPUT
 }
 
 NAME
-delete class
+delete class success
 INPUT
 deleteClass(Post);
 y
@@ -157,6 +165,7 @@ getDesc(Post);
 build(Post);
 OUTPUT
 [
+    "Favorites",
     "Prims",
     "User"
 ]

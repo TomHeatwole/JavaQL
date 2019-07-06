@@ -109,7 +109,7 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
     case TokenType::M_GET_ALL_DESC:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
-        return success(json_encode($class_map, JSON_PRETTY_PRINT));
+        return success(json_encode(class_map_print_format($class_map), JSON_PRETTY_PRINT));
     case TokenType::M_GET_DESC:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
@@ -787,6 +787,12 @@ function map_replace(Map $old_map, string $old_key, string $new_key): Map {
         if ($key === $old_key) $new_map[$new_key] = $old_map[$key];
         else $new_map[$key] = $old_map[$key];
     }
+    return $new_map;
+}
+
+function class_map_print_format(Map $old_map) {
+    $new_map = new Map();
+    foreach ($old_map->toKeysArray() as $key) $new_map[$key] = map_replace_list_types($old_map[$key]);
     return $new_map;
 }
 
