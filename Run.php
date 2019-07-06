@@ -30,10 +30,10 @@ echo "Connected successfully\n";
 // Load Classes
 echo "Loading classes...\n";
 $class_map = dict[];
-$result = mysqli_query($_GLOBALS["conn"], "show tables");
+$result = mysqli_query($_GLOBALS["conn"], "SHOW TABLES");
 while ($row = mysqli_fetch_row($result)) {
     if ($row[0][0] === "_") continue;
-    $class = mysqli_query($_GLOBALS["conn"], "describe " . $row[0]);
+    $class = mysqli_query($_GLOBALS["conn"], "DESCRIBE " . $row[0]);
     $vars = dict[];
     while ($var = mysqli_fetch_assoc($class)) {
         $name = $var['Field'];
@@ -1002,5 +1002,15 @@ function collect_list_garbo(dict $_GLOBALS) {
         }
     }
     return true;
+}
+
+// For debugging
+function destroy_all_lists(dict $_GLOBALS) {
+    $result = mysqli_query($_GLOBALS["conn"], "SHOW TABLES");
+    while ($row = mysqli_fetch_row($result)) {
+        if ($row[0][0] === "_" && $row[0] !== "_list") // TODO: store dict of admin tables starting with _
+            mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $row[0]);
+    }
+    mysqli_query($_GLOBALS["conn"], "DELETE FROM _list");
 }
 
