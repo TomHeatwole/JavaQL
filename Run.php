@@ -72,7 +72,7 @@ for (;;) {
         break;
     }
     if (!$lex = lex_line($_GLOBALS, vec[], $line, 0, true, false)) continue;
-    if (!parse_and_execute($_GLOBALS, $lex["tokens"], $line)) continue;
+    if (!parse_and_execute(&$_GLOBALS, $lex["tokens"], $line)) continue;
     $query_results = new Vector();
     $quit = false;
     for ($i = 0; $i < count($_GLOBALS["query_queue"]); $i++) {
@@ -100,7 +100,7 @@ for (;;) {
         success(single_query_result_to_string($_GLOBALS, $query_results[$print_qr["qr_num"]], $print_qr["class_name"]));
 }
 
-function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
+function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
     if (count($lex) == 0) return false;
     $class_map = $_GLOBALS["class_map"];
     $i = 1;
@@ -170,15 +170,18 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         $ruined_classes = vec[];
+        // TODO: do we need a deleteMultiple() if there's a codependency?
+        // - Should we let the user know about this when they try to delete?
         foreach ($_GLOBALS["class_map"]->toKeysArray() as $key) {
             if ($key === $class_name) continue;
             // TODO: Also check for arrays and lists of this type later
             foreach ($_GLOBALS["class_map"][$key] as $type) {
-                if ($type === $class_name) $ruined_classes[] = $key;
+                if ($type === $class_name || ($type instanceof ListType && $type->subtype === $class_name))
+                    $ruined_classes[] = $key;
             }
         }
         if (count($ruined_classes) > 0)
-            return error("cannot remove class because the following classes have objects of type "
+            return error("cannot remove class because the following classes have objects or lists using type "
             . $class_name . ": " . implode(", ", $ruined_classes));
         $confirm = readline("Are you sure you want remove class " . $class_name . " and delete all of its objects? (y/n) ");
         if ($confirm !== "y" && $confirm !== "yes") return false;
@@ -245,7 +248,8 @@ function parse_and_execute(dict $_GLOBALS, vec $lex, string $line) {
             if (!mysqli_query($_GLOBALS["conn"], $query . ", PRIMARY KEY(_id))")) {
                 return error($_GLOBALS["MYSQL_ERROR"]);
             }
-            $_GLOBALS["class_map"][$class_name] = new Map($var_map);
+            $class_map = map_add_lexo($_GLOBALS["class_map"], $class_name, new Map($var_map));
+            $_GLOBALS["class_map"] = $class_map;
             return true;
         }
         // TODO: Code for rebuild
@@ -806,16 +810,19 @@ function map_replace_list_types(Map $old_map) {
     return $new_map;
 }
 
-/* TODO
-function map_add_alphabetical(Map $old_map, string $new_key, $new_value) {
+function map_add_lexo(Map $old_map, string $new_key, $new_value) {
     $new_map = new Map();
+    $not_added = true;
     foreach ($old_map->toKeysArray() as $key) {
-        if ($key > $new_key) $new_map[$new_key] = $new_value;
+        if ($not_added && $key > $new_key) {
+            $not_added = false;
+            $new_map[$new_key] = $new_value;
+        }
         $new_map[$key] = $old_map[$key];
     }
+    if ($not_added) $new_map[$new_key] = $new_value;
     return $new_map;
 }
- */
 
 function lex_file($_GLOBALS, $class_name) {
     $file_path = $_GLOBALS["CLASSES_DIR"] . $class_name . ".java";

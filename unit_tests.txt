@@ -158,17 +158,23 @@ OUTPUT
 NAME
 delete class success
 INPUT
+deleteClass(Favorites);
+y
 deleteClass(Post);
 y
 getClassNames();
+getDesc(Favorites);
 getDesc(Post);
 build(Post);
+build(Favorites);
 OUTPUT
 [
-    "Favorites",
     "Prims",
     "User"
 ]
+getDesc(Favorites);
+        ^
+Error: expected class name but found unknown identifier
 getDesc(Post);
         ^
 Error: expected class name but found unknown identifier
@@ -199,12 +205,15 @@ OUTPUT
 NAME
 delete class, are you sure, no
 INPUT
-deleteClass(Post)
+deleteClass(Favorites)
 no
-getDesc(Post);
+getDesc(Favorites);
 OUTPUT
 {
-    "content": "String",
+    "posts": "List<Post>",
+    "comments": "List<String>",
+    "tripleList": "List<List<List<int>>>",
+    "triplePrims": "List<List<List<Prims>>>",
     "owner": "User"
 }
 
@@ -213,7 +222,7 @@ delete class fail on dependency
 INPUT
 deleteClass(Prims)
 OUTPUT
-Error: cannot remove class because the following classes have objects of type Prims: User
+Error: cannot remove class because the following classes have objects or lists using type Prims: Favorites, User
 
 NAME
 rename class variable success
