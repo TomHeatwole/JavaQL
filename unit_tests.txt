@@ -670,3 +670,45 @@ Error: malformed number
 6e
 ^
 Error: malformed number
+
+NAME
+local list init fail
+INPUT
+List<int> badList1 = new List<Post>();
+List<Post> badList2 = new List();
+List<List<Post>> badList3 = new List<Post>();
+List<Post> badList4 = new List<List<Post>>();
+OUTPUT
+List<int> badList1 = new List<Post>();
+                              ^
+Error: expected int but found class name
+List<Post> badList2 = new List();
+                              ^
+Error: expected < but found (
+List<List<Post>> badList3 = new List<Post>();
+                                     ^
+Error: expected List but found class name
+List<Post> badList4 = new List<List<Post>>();
+                               ^
+Error: expected Post but found List
+
+NAME
+local list init success
+INPUT
+List<int> goodList1;
+goodList1;
+goodList1 = new List<int>();
+goodList1;
+List<Post> goodList2 = new List<Post>();
+goodList2;
+List<List<List<Post>>> goodList3 = new List<List<List<Post>>>();
+List<List<char>> goodList4 = new List<List<char>>();
+goodList3;
+goodList4;
+OUTPUT
+null
+List@#
+List@#
+List@#
+List@#
+

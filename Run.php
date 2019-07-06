@@ -59,13 +59,18 @@ $_GLOBALS["class_map"] = new Map($class_map);
 $_GLOBALS["list_table_names"] = new Map($list_table_names);
 $_GLOBALS["symbol_table"] = new Map();
 
+collect_list_garbo($_GLOBALS);
+
 // Begin CLI 
 for (;;) {
     $_GLOBALS["query_queue"] = new Vector();
     $_GLOBALS["assign"] = new Map();
     $_GLOBALS["print_qr"] = new Map();
     $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
-    if ($line === "q" || $line === "quit") break;
+    if ($line === "q" || $line === "quit") {
+        collect_list_garbo($_GLOBALS);
+        break;
+    }
     if (!$lex = lex_line($_GLOBALS, vec[], $line, 0, true, false)) continue;
     if (!parse_and_execute($_GLOBALS, $lex["tokens"], $line)) continue;
     $query_results = new Vector();
@@ -983,5 +988,19 @@ function int_trim_zeros(string $val): string {
     for (; $i < strlen($val) - 1; $i++)
         if ($val[$i] !== "0") break;
     return $prefix . substr($val, $i);
+}
+
+function collect_list_garbo(dict $_GLOBALS) {
+    $result = mysqli_query($_GLOBALS["conn"], "SELECT _id, ref_count, location FROM _list");
+    if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
+    while ($row = mysqli_fetch_assoc($result)) {
+        if ($row["ref_count"] === 0) {
+            if (!mysqli_query($_GLOBALS["conn"], "DELETE FROM _list WHERE _id=" . $row["_id"])) {
+                return error($_GLOBALS["MYSQL_ERROR"]);
+            }
+            if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $row["location"])) return error($_GLOBALS["MYSQL_ERROR"]);
+        }
+    }
+    return true;
 }
 
