@@ -78,21 +78,20 @@ for (;;) {
     for ($i = 0; $i < count($_GLOBALS["query_queue"]); $i++) {
         $query_pieces = $_GLOBALS["query_queue"][$i];
         for ($j = 0; $j < count($query_pieces); $j++)
-            if (is_int($query_pieces[$j])) $query_pieces[$j] = mysqli_fetch_row($query_results[$query_pieces[$j]])[0];
+            if (is_int($query_pieces[$j])) $query_pieces[$j] = $query_results[$query_pieces[$j]][0];
         if (!$result = mysqli_query($_GLOBALS["conn"], implode($query_pieces))) {
             error($_GLOBALS["MYSQL_ERROR"]);
-            echo implode($query_pieces), "\n";
             $quit = true;
         }
         if ($quit) break;
-        $query_results[] = $result;
+        $query_results[] = ($result === true) ? $result : mysqli_fetch_row($result);
     }
     if ($quit) continue;
     $assign = $_GLOBALS["assign"];
     if (count($assign) > 0)
         $_GLOBALS["symbol_table"][$assign["name"]] = shape(
             "type" => $assign["type"],
-            "value" => mysqli_fetch_row($query_results[$assign["q_num"]])[0],
+            "value" => $query_results[$assign["q_num"]][0],
         );
     $print_qr = $_GLOBALS["print_qr"];
     if (count($print_qr) > 0)
@@ -150,7 +149,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         if (!$result = mysqli_query($_GLOBALS["conn"], "SELECT * FROM "
             . $param["type"] . " WHERE _ID=" . $param["value"]))
             return error($_GLOBALS["MYSQL_ERROR"]);
-        return success(single_query_result_to_string($_GLOBALS, $result, $param["type"]));
+        return success(single_query_result_to_string($_GLOBALS, mysqli_fetch_row($result), $param["type"]));
     case TokenType::M_GET_ALL_OBJECTS:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         if (!($class_name = must_match($_GLOBALS, $lex, ++$i, $line, TokenType::CLASS_ID))) return false;
@@ -185,7 +184,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
             . $class_name . ": " . implode(", ", $ruined_classes));
         $confirm = readline("Are you sure you want remove class " . $class_name . " and delete all of its objects? (y/n) ");
         if ($confirm !== "y" && $confirm !== "yes") return false;
-        $bad_lists = mysqli_query($_GLOBALS["conn"], "SELECT location from _list WHERE generic=\""
+        $bad_lists = mysqli_query($_GLOBALS["conn"], "SELECT _id from _list WHERE generic=\""
             . $class_name . "\" OR generic REGEXP \"^_L[1-9]\d*" . $class_name . "$\"");
         if (!$bad_lists) return mysqli_error($_GLOBALS["MYSQL_ERROR"]);
         while ($list = mysqli_fetch_row($bad_lists))
@@ -436,24 +435,24 @@ function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, int $ref_
     $size = 0;
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
     // TODO: consider adding what list constructor expects ??
-    $table_name = get_new_list_table_name($_GLOBALS);
     $subtype_table = $subtype;
     if ($subtype instanceof ListType) {
         $subtype_table = "_list";
         $sql_type = "int";
     } else $sql_type = $_GLOBALS["PRIM"]->contains($subtype) ? $_GLOBALS["TO_SQL_TYPE_MAP"][$subtype] : "int";
-    $query = "CREATE TABLE " . $table_name . " (value " . $sql_type;
-    $query .= ($sql_type === "int")
-        ? ", FOREIGN KEY (value) REFERENCES " . $subtype_table . "(_id) ON DELETE SET NULL)"
-        : ")";
-    $_GLOBALS["query_queue"][] = vec[$query];
-    $insert_values = vec["default", list_subtype_to_sql($subtype), $size, $ref_count, add_quotes($table_name)];
+    $insert_values = vec["default", list_subtype_to_sql($subtype), $size, $ref_count];
     $_GLOBALS["query_queue"][] = vec["INSERT INTO _list VALUES (" . implode(", ", $insert_values) . " )"];
     $_GLOBALS["query_queue"][] = vec["SELECT LAST_INSERT_ID()"];
-    return shape(
+    $ret = shape(
         "type" => new ListType($subtype, 0),
         "value" => new QueryResult(count($_GLOBALS["query_queue"]) - 1)
     );
+    $cols = " (value " . $sql_type;
+    $cols .= ($sql_type === "int")
+        ? ", FOREIGN KEY (value) REFERENCES " . $subtype_table . "(_id) ON DELETE SET NULL)"
+        : ")";
+    $_GLOBALS["query_queue"][] = vec["CREATE TABLE _list_", $ret["value"]->q_num, $cols];
+    return $ret;
 }
 
 function list_subtype_to_sql($subtype): string {
@@ -474,16 +473,6 @@ function parse_list_subtype(dict $_GLOBALS, vec $lex, int &$i, $e, string $line)
     } else if ($subtype !== $e && $e !== "") return expected_but_found($_GLOBALS, $lex[$i - 1], $line, $e);
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::GT)) return false;
     return $subtype;
-}
-
-function get_new_list_table_name(dict $_GLOBALS) : string {
-    $alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    for (;;) {
-        $table_name_vec = vec["_"];
-        for ($i = 0; $i < 20; $i++) $table_name_vec[] = $alpha[rand(0,51)];
-        $table_name = implode($table_name_vec);
-        if (!$_GLOBALS["list_table_names"]->contains($table_name)) return $table_name;
-    }
 }
 
 function assign(dict $_GLOBALS, vec $lex, int $i, $e, string $line, string $name): boolean {
@@ -633,10 +622,9 @@ function query_result_to_string(dict $_GLOBALS, $result, string $class_name): st
 function single_query_result_to_string(dict $_GLOBALS, $result, string $class_name): string {
     $var_names = $_GLOBALS["class_map"][$class_name]->toKeysArray();
     $var_types = $_GLOBALS["class_map"][$class_name]->toValuesArray();
-    $row = mysqli_fetch_row($result);
     $vars = dict[];
-    for ($i = 1; $i < count($row); $i++)
-        $vars[$var_names[$i - 1]] = get_display_val($_GLOBALS, $var_types[$i - 1], $row[$i]);
+    for ($i = 1; $i < count($result); $i++)
+        $vars[$var_names[$i - 1]] = get_display_val($_GLOBALS, $var_types[$i - 1], $result[$i]);
     return json_encode($vars, JSON_PRETTY_PRINT);
 }
 
@@ -1009,19 +997,19 @@ function int_trim_zeros(string $val): string {
 }
 
 function collect_list_garbo(dict $_GLOBALS) {
-    $result = mysqli_query($_GLOBALS["conn"], "SELECT ref_count, location FROM _list");
+    $result = mysqli_query($_GLOBALS["conn"], "SELECT _id, ref_count FROM _list");
     if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
     while ($row = mysqli_fetch_assoc($result)) {
-        if ($row["ref_count"] === 0) delete_list($_GLOBALS, $row["location"]);
+        if ($row["ref_count"] === 0) delete_list($_GLOBALS, $row["_id"]);
     }
     return true;
 }
 
-function delete_list(dict $_GLOBALS, string $location) {
-    if (!mysqli_query($_GLOBALS["conn"], "DELETE FROM _list WHERE location=\"" . $location . "\"")) {
+function delete_list(dict $_GLOBALS, int $id) {
+    if (!mysqli_query($_GLOBALS["conn"], "DELETE FROM _list WHERE _id=" . $id)) {
         return error($_GLOBALS["MYSQL_ERROR"]);
     }
-    if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $location)) return error($_GLOBALS["MYSQL_ERROR"]);
+    if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE _list_" . $id)) return error($_GLOBALS["MYSQL_ERROR"]);
     return true;
 }
 
