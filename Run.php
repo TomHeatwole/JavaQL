@@ -185,9 +185,14 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
             . $class_name . ": " . implode(", ", $ruined_classes));
         $confirm = readline("Are you sure you want remove class " . $class_name . " and delete all of its objects? (y/n) ");
         if ($confirm !== "y" && $confirm !== "yes") return false;
-        // HEREE
+        $bad_lists = mysqli_query($_GLOBALS["conn"], "SELECT location from _list WHERE generic=\""
+            . $class_name . "\" OR generic REGEXP \"^_L[1-9]\d*" . $class_name . "$\"");
+        if (!$bad_lists) return mysqli_error($_GLOBALS["MYSQL_ERROR"]);
+        while ($list = mysqli_fetch_row($bad_lists))
+            if (!delete_list($_GLOBALS, $list[0])) return false;
         if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $class_name)) return error($_GLOBALS["MYSQL_ERROR"]);
         $_GLOBALS["class_map"]->remove($class_name);
+        // TODO: delete local variables of this type
         return true;
     case TokenType::M_BUILD:
         if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
@@ -552,7 +557,7 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $r
         $int_val = (int)$token["value"];
         if ($e === "float") {
             if (doubleval($token["value"]) <= $_GLOBALS["FLOAT_MAX"]
-                && doubleval($token["value"] >= -$GLOBALS["FLOAT_MAX"]))
+                && doubleval($token["value"] >= -$_GLOBALS["FLOAT_MAX"]))
                 return shape("value" => floatval($token["value"]), "type" => $e);
             return carrot_and_error("int literal is too large for type float", $line, $token["char_num"]);
         }
@@ -1017,6 +1022,7 @@ function delete_list(dict $_GLOBALS, string $location) {
         return error($_GLOBALS["MYSQL_ERROR"]);
     }
     if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $location)) return error($_GLOBALS["MYSQL_ERROR"]);
+    return true;
 }
 
 // For debugging
