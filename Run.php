@@ -185,7 +185,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
             . $class_name . ": " . implode(", ", $ruined_classes));
         $confirm = readline("Are you sure you want remove class " . $class_name . " and delete all of its objects? (y/n) ");
         if ($confirm !== "y" && $confirm !== "yes") return false;
-        // TODO: delete all existing lists of this type before running the query below;
+        // HEREE
         if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $class_name)) return error($_GLOBALS["MYSQL_ERROR"]);
         $_GLOBALS["class_map"]->remove($class_name);
         return true;
@@ -1004,17 +1004,19 @@ function int_trim_zeros(string $val): string {
 }
 
 function collect_list_garbo(dict $_GLOBALS) {
-    $result = mysqli_query($_GLOBALS["conn"], "SELECT _id, ref_count, location FROM _list");
+    $result = mysqli_query($_GLOBALS["conn"], "SELECT ref_count, location FROM _list");
     if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
     while ($row = mysqli_fetch_assoc($result)) {
-        if ($row["ref_count"] === 0) {
-            if (!mysqli_query($_GLOBALS["conn"], "DELETE FROM _list WHERE _id=" . $row["_id"])) {
-                return error($_GLOBALS["MYSQL_ERROR"]);
-            }
-            if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $row["location"])) return error($_GLOBALS["MYSQL_ERROR"]);
-        }
+        if ($row["ref_count"] === 0) delete_list($_GLOBALS, $row["location"]);
     }
     return true;
+}
+
+function delete_list(dict $_GLOBALS, string $location) {
+    if (!mysqli_query($_GLOBALS["conn"], "DELETE FROM _list WHERE location=\"" . $location . "\"")) {
+        return error($_GLOBALS["MYSQL_ERROR"]);
+    }
+    if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $location)) return error($_GLOBALS["MYSQL_ERROR"]);
 }
 
 // For debugging
