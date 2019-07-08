@@ -28,7 +28,7 @@ class ListType {
     }
 
     public function __toString() {
-        return "List";
+        return implode(vec[str_repeat("List<", $this->dim), $this->subtype, str_repeat(">", $this->dim)]);
     }
 
     public function inner() {

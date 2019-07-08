@@ -725,10 +725,10 @@ goodList3;
 goodList4;
 OUTPUT
 null
-List@#
-List@#
-List@#
-List@#
+List<int>@#
+List<Post>@#
+List<List<List<Post>>>@#
+List<List<char>>@#
 
 NAME
 clear local variables
