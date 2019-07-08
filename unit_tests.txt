@@ -773,3 +773,22 @@ Favorites fave3 = new Favorites(null, null, tripleList, new List<List<Prims>>(),
 Error: expected List<Prims> but found class name
 Favorites constructor expects the following parameters: (List<Post> posts, List<String> comments, List<List<List<int>>> tripleList, List<List<List<Prims>>> triplePrims, User owner)
 
+NAME
+lists as class variables success
+INPUT
+Favorites goodFave = new Favorites(null, null, null, new List<List<List<Prims>>>(), null);
+List<Post> nullPostList;
+goodFave.posts = nullPostList;
+goodFave.comments = new List<String>();
+Favorites goodFave2 = new Favorites(null, null, new List<List<List<int>>>(), null, null);
+goodFave.tripleList = goodFave2.tripleList;
+getVariables(goodFave);
+OUTPUT
+{
+    "posts": "null",
+    "comments": "List<String>@#",
+    "tripleList": "List<List<List<int>>>@#",
+    "triplePrims": "List<List<List<Prims>>>@#",
+    "owner": "null"
+}
+
