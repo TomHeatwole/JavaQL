@@ -59,7 +59,7 @@ $_GLOBALS["class_map"] = new Map($class_map);
 $_GLOBALS["list_table_names"] = new Map($list_table_names);
 $_GLOBALS["symbol_table"] = new Map();
 
-collect_list_garbo($_GLOBALS);
+collect_garbo($_GLOBALS);
 
 // Begin CLI 
 for (;;) {
@@ -68,7 +68,7 @@ for (;;) {
     $_GLOBALS["print_qr"] = new Map();
     $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
     if ($line === "q" || $line === "quit") {
-        collect_list_garbo($_GLOBALS);
+        collect_garbo($_GLOBALS);
         break;
     }
     if (!$lex = lex_line($_GLOBALS, vec[], $line, 0, true, false)) continue;
@@ -192,6 +192,12 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $class_name)) return error($_GLOBALS["MYSQL_ERROR"]);
         $_GLOBALS["class_map"]->remove($class_name);
         // TODO: delete local variables of this type
+        return true;
+    case TokenType::M_CLEAR_LOCAL_VARIABLES:
+        if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
+        if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
+        $_GLOBALS["symbol_table"] = new Map();
+        collect_garbo($_GLOBALS);
         return true;
     case TokenType::M_BUILD:
         if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
@@ -996,7 +1002,7 @@ function int_trim_zeros(string $val): string {
     return $prefix . substr($val, $i);
 }
 
-function collect_list_garbo(dict $_GLOBALS) {
+function collect_garbo(dict $_GLOBALS) {
     $result = mysqli_query($_GLOBALS["conn"], "SELECT _id, ref_count FROM _list");
     if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
     while ($row = mysqli_fetch_assoc($result)) {

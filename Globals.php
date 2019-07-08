@@ -100,6 +100,7 @@ enum TokenType: int {
     M_GET_VARIABLES_RECURSIVE = 60;
     M_DELETE_ALL_OBJECTS = 61;
     M_DELETE_CLASS = 62;
+    M_CLEAR_LOCAL_VARIABLES = 64;
 }
 
 $_GLOBALS = dict[
@@ -172,6 +173,7 @@ $_GLOBALS = dict[
         TokenType::SEMI => ";",
         TokenType::DOT => ".",
         TokenType::COMMA => ",",
+        TOkenType::M_CLEAR_LOCAL_VARIABLES => "method name",
         TokenType::M_DELETE_CLASS => "method name",
         TokenType::M_DELETE_ALL_OBJECTS => "method name",
         TokenType::M_GET_ALL_DESC => "method name",
@@ -260,6 +262,7 @@ $_GLOBALS = dict[
     ]),
     "ESCAPE_CHARS" => new Set(vec["b", "t", "0", "n", "r", "\"", "'", "\\"]),
     "KEYWORDS" => new Map(dict[
+        "clearLocalVariables" => TokenType::M_CLEAR_LOCAL_VARIABLES,
         "deleteClass" => TokenTYpe::M_DELETE_CLASS,
         "deleteAllObjects" => TokenType::M_DELETE_ALL_OBJECTS,
         "getAllDesc" => TokenType::M_GET_ALL_DESC,

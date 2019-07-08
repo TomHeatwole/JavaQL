@@ -730,3 +730,19 @@ List@#
 List@#
 List@#
 
+NAME
+clear local variables
+INPUT
+int clear1 = 19;
+byte clear2;
+Post clear3;
+List<Post> clear4 = new List<Post>();
+clearLocalVariables();
+getLocalVariables();
+clear2
+OUTPUT
+{}
+clear2
+^
+Error: unexpected token: clear2
+
