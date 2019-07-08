@@ -442,7 +442,7 @@ OUTPUT
 "delivery_driver"
 
 NAME
-deference display char and String correctly
+deference display char and String success 
 INPUT
 Prims derefPrims = new Prims("This is a string", 0, 0, 0, 0, 0, 0, 'c', false);
 derefPrims.s
@@ -460,7 +460,9 @@ char param3;
 boolean param4 = true; 
 new Prims(param1, param2, param2, param2, param2, param2, param2, param3, param4);
 User userParam = new User("hacker", 460709345793457, null, null);
-new Post("Post request", userParam);
+Post setUserNull = new Post("Post request", userParam);
+User nullUser;
+setUserNull.owner = nullUser;
 OUTPUT
 
 NAME
@@ -705,7 +707,7 @@ List<Post> badList2 = new List();
 Error: expected < but found (
 List<List<Post>> badList3 = new List<Post>();
                                      ^
-Error: expected List but found class name
+Error: expected List<Post> but found class name
 List<Post> badList4 = new List<List<Post>>();
                                ^
 Error: expected Post but found List
@@ -723,11 +725,14 @@ List<List<List<Post>>> goodList3 = new List<List<List<Post>>>();
 List<List<char>> goodList4 = new List<List<char>>();
 goodList3;
 goodList4;
+List<List<char>> goodList5 = goodList4;
+goodList5;
 OUTPUT
 null
 List<int>@#
 List<Post>@#
 List<List<List<Post>>>@#
+List<List<char>>@#
 List<List<char>>@#
 
 NAME
@@ -745,4 +750,26 @@ OUTPUT
 clear2
 ^
 Error: unexpected token: clear2
+
+NAME
+lists as class variables fail
+INPUT
+Favorites fave1 = new Favorites(null, null, null, null, null);
+fave1.posts = new List<int>();
+fave1.comments = new List<String>();
+List<List<List<int>>> tripleList = new List<List<List<int>>>();
+Favorites fave2 = new Favorites(null, null, null, tripleList, null);
+Favorites fave3 = new Favorites(null, null, tripleList, new List<List<Prims>>(), null);
+OUTPUT
+fave1.posts = new List<int>();
+                       ^
+Error: expected Post but found int
+Favorites fave2 = new Favorites(null, null, null, tripleList, null);
+                                                  ^
+Error: expected List<List<List<Prims>>> but found List<List<List<int>>>
+Favorites constructor expects the following parameters: (List<Post> posts, List<String> comments, List<List<List<int>>> tripleList, List<List<List<Prims>>> triplePrims, User owner)
+Favorites fave3 = new Favorites(null, null, tripleList, new List<List<Prims>>(), null);
+                                                                      ^
+Error: expected List<Prims> but found class name
+Favorites constructor expects the following parameters: (List<Post> posts, List<String> comments, List<List<List<int>>> tripleList, List<List<List<Prims>>> triplePrims, User owner)
 

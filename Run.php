@@ -81,6 +81,7 @@ for (;;) {
             if (is_int($query_pieces[$j])) $query_pieces[$j] = $query_results[$query_pieces[$j]][0];
         if (!$result = mysqli_query($_GLOBALS["conn"], implode($query_pieces))) {
             error($_GLOBALS["MYSQL_ERROR"]);
+            // echo implode($query_pieces); // For debugging
             $quit = true;
         }
         if ($quit) break;
@@ -375,6 +376,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
             else if (!must_end($lex, $i, $line)) return false;
             $set_val = $set_val["value"];
             $query = "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=";
+            if ($set_val === null) $set_val = "null";
             if ($set_val instanceof QueryResult) {
                 $query_pieces = vec[$query];
                 $query_pieces[] = $set_val->q_num;
@@ -524,6 +526,13 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $r
     switch($token["type"]) {
     case TokenType::NEW_LITERAL:
         return ($val = new_object($_GLOBALS, $lex, &$i, $line, $e, $ref)) ? $val : false;
+    case TokenType::LIST_ID:
+        //TODO: check for .get or [] or whatever
+        $sym = $_GLOBALS["symbol_table"][$token["value"]];
+        if ($e === "" || $e == $sym["type"]) return $sym;
+        return ($e instanceof ListType)
+            ? expected_but_found_list($sym["type"], $token, $line, $e)
+            : expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::OBJ_ID:
         $sym = $_GLOBALS["symbol_table"][$token["value"]];
         if ($lex[$i]["type"] === TokenType::DOT) {
@@ -693,8 +702,11 @@ function expected_but_found_literal($token, string $line, string $e): boolean {
         . add_quotes($token["value"]), $line, $token["char_num"]);
 }
 
+function expected_but_found_list($found_type, $token, string $line, $e) {
+    return carrot_and_error("expected " . $e . " but found " . $found_type, $line, $token["char_num"]);
+}
+
 function expected_but_found(dict $_GLOBALS, $token, string $line, $e): boolean {
-    if ($e instanceof ListType) $e = "List";
     return carrot_and_error("expected " . $e . " but found " .
         $_GLOBALS["TOKEN_NAME_MAP"][$token["type"]], $line, $token["char_num"]);
 }
