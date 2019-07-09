@@ -384,6 +384,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
                 $_GLOBALS["query_queue"][] = $query_pieces;
             } else if (!mysqli_query($_GLOBALS["conn"], $query . $set_val .
                 " WHERE _id=" . $d["parent"]["value"])) return error($_GLOBALS["MYSQL_ERROR"]);
+            if ($d["type"] instanceof ListType) decrement_ref_count($_GLOBALS, $d["value"]);
             return true;
         }
         if ($lex[$i]["type"] === TokenType::ASSIGN)
@@ -514,6 +515,7 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
         $type = $class_var_type;
         if ($type === "String") $value = add_quotes($value);
         else if ($type === "char") $value = "'" . $value . "'";
+        // TODO: if we're on a list check for a .get or []
         if ($lex[++$i]["type"] !== TokenType::DOT || $is_primitive) break;
     }
     return shape("parent" => $parent, "value" => $value, "type" => $type, "row_name" => $row_name);
@@ -529,7 +531,10 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $r
     case TokenType::LIST_ID:
         //TODO: check for .get or [] or whatever
         $sym = $_GLOBALS["symbol_table"][$token["value"]];
-        if ($e === "" || $e == $sym["type"]) return $sym;
+        if ($e === "" || $e == $sym["type"]) {
+            if ($ref) increment_ref_count($_GLOBALS, $sym["value"]);
+            return $sym;
+        }
         return ($e instanceof ListType)
             ? expected_but_found_list($sym["type"], $token, $line, $e)
             : expected_but_found($_GLOBALS, $token, $line, $e);
@@ -538,8 +543,9 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $r
         if ($lex[$i]["type"] === TokenType::DOT) {
             $i++;
             if (!$sym = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line)) return false;
+            if ($sym["type"] instanceof ListType && $ref) increment_ref_count($_GLOBALS, $sym["value"]);
         }
-        if ($sym["type"] === $e || $e === "") return $sym;
+        if ($sym["type"] == $e || $e === "") return $sym;
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::BOOLEAN_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["boolean"]));
     case TokenType::CHAR_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["char", "String"]));
@@ -1029,6 +1035,16 @@ function delete_list(dict $_GLOBALS, int $id) {
     }
     if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE _list_" . $id)) return error($_GLOBALS["MYSQL_ERROR"]);
     return true;
+}
+
+function decrement_ref_count(dict $_GLOBALS, $id) {
+    if ($id === null) return;
+    $_GLOBALS["query_queue"][] = vec["UPDATE _list SET ref_count = ref_count - 1 WHERE _id=" . $id];
+}
+
+function increment_ref_count(dict $_GLOBALS, $id) {
+    if ($id === null) return;
+    $_GLOBALS["query_queue"][] = vec["UPDATE _list SET ref_count = ref_count + 1 WHERE _id=" . $id];
 }
 
 // For debugging
