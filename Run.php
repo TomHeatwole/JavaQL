@@ -163,15 +163,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         $confirm = readline("Are you sure you want to delete all objects of class " . $class_name . "? (y/n) ");
         if ($confirm !== "y" && $confirm !== "yes") return false;
-        $class_vars = $_GLOBALS["class_map"][$class_name];
-        foreach($class_vars->toKeysArray() as $key) {
-            if ($class_vars[$key] instanceof ListType) {
-               $col = get_sql_column($_GLOBALS, $class_vars[$key], $key); 
-               mysqli_query($_GLOBALS["conn"], "UPDATE _list l INNER JOIN (SELECT l._id, count(l._id) num_refs FROM "
-                   . $class_name . " INNER JOIN _list l ON " . $col["name"] . "=l._id GROUP BY l._id) c ON l._id=c._id "
-                   . "SET ref_count = ref_count - num_refs");
-            }
-        } 
+        remove_all_list_references($_GLOBALS, $class_name);
         mysqli_query($_GLOBALS["conn"], "DELETE FROM " . $class_name);
         return true;
     case TokenType::M_DELETE_CLASS:
@@ -199,6 +191,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         if (!$bad_lists) return mysqli_error($_GLOBALS["MYSQL_ERROR"]);
         while ($list = mysqli_fetch_row($bad_lists))
             if (!delete_list($_GLOBALS, $list[0])) return false;
+        remove_all_list_references($_GLOBALS, $class_name);
         if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $class_name)) return error($_GLOBALS["MYSQL_ERROR"]);
         $_GLOBALS["class_map"]->remove($class_name);
         // TODO: delete local variables of this type
@@ -1063,5 +1056,17 @@ function destroy_all_lists(dict $_GLOBALS) {
             mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $row[0]);
     }
     mysqli_query($_GLOBALS["conn"], "DELETE FROM _list");
+}
+
+function remove_all_list_references(dict $_GLOBALS, string $class_name) {
+    $class_vars = $_GLOBALS["class_map"][$class_name];
+    foreach($class_vars->toKeysArray() as $key) {
+        if ($class_vars[$key] instanceof ListType) {
+           $col = get_sql_column($_GLOBALS, $class_vars[$key], $key); 
+           mysqli_query($_GLOBALS["conn"], "UPDATE _list l INNER JOIN (SELECT l._id, count(l._id) num_refs FROM "
+               . $class_name . " INNER JOIN _list l ON " . $col["name"] . "=l._id GROUP BY l._id) c ON l._id=c._id "
+               . "SET ref_count = ref_count - num_refs");
+        }
+    } 
 }
 
