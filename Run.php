@@ -163,6 +163,15 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         if (!r_paren_semi($_GLOBALS, $lex, ++$i, $line)) return false;
         $confirm = readline("Are you sure you want to delete all objects of class " . $class_name . "? (y/n) ");
         if ($confirm !== "y" && $confirm !== "yes") return false;
+        $class_vars = $_GLOBALS["class_map"][$class_name];
+        foreach($class_vars->toKeysArray() as $key) {
+            if ($class_vars[$key] instanceof ListType) {
+               $col = get_sql_column($_GLOBALS, $class_vars[$key], $key); 
+               mysqli_query($_GLOBALS["conn"], "UPDATE _list l INNER JOIN (SELECT l._id, count(l._id) num_refs FROM "
+                   . $class_name . " INNER JOIN _list l ON " . $col["name"] . "=l._id GROUP BY l._id) c ON l._id=c._id "
+                   . "SET ref_count = ref_count - num_refs");
+            }
+        } 
         mysqli_query($_GLOBALS["conn"], "DELETE FROM " . $class_name);
         return true;
     case TokenType::M_DELETE_CLASS:
@@ -775,7 +784,6 @@ function java_ref_to_mysql($type, string $name): string {
         ? "_L" . $type->dim . "_" . strlen($type->subtype) . $type->subtype . $name 
         : "_" . strlen($type) . $type . $name;
 }
-
 
 function success($print): boolean {
     echo $print, "\n";
