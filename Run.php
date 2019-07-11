@@ -48,15 +48,10 @@ while ($row = mysqli_fetch_row($result)) {
     $class_map[$row[0]] = new Map($vars);
 }
 
-// Load lists
-$list_table_names = vec[];
-// TODO: load lists
-
 echo "Classes loaded\n\n";
 
 
 $_GLOBALS["class_map"] = new Map($class_map);
-$_GLOBALS["list_table_names"] = new Map($list_table_names);
 $_GLOBALS["symbol_table"] = new Map();
 
 collect_garbo($_GLOBALS);
@@ -175,7 +170,6 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         // - Should we let the user know about this when they try to delete?
         foreach ($_GLOBALS["class_map"]->toKeysArray() as $key) {
             if ($key === $class_name) continue;
-            // TODO: Also check for arrays and lists of this type later
             foreach ($_GLOBALS["class_map"][$key] as $type) {
                 if ($type === $class_name || ($type instanceof ListType && $type->subtype === $class_name))
                     $ruined_classes[] = $key;
@@ -194,7 +188,12 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         remove_all_list_references($_GLOBALS, $class_name);
         if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE " . $class_name)) return error($_GLOBALS["MYSQL_ERROR"]);
         $_GLOBALS["class_map"]->remove($class_name);
-        // TODO: delete local variables of this type
+        foreach ($_GLOBALS["symbol_table"]->toKeysArray() as $var_name) {
+            $sym = $_GLOBALS["symbol_table"][$var_name];
+            if ($sym["type"] === $class_name ||
+                ($sym["type"] instanceof ListType && $sym["type"]->subtype === $class_name))
+                $_GLOBALS["symbol_table"]->remove($var_name);
+        }
         return true;
     case TokenType::M_CLEAR_LOCAL_VARIABLES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
