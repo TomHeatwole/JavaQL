@@ -22,7 +22,7 @@ echo "Attempting to connect to database...\n";
 $_GLOBALS["conn"] = mysqli_connect(trim($host), trim($username), trim($password), trim($database));
 
 // Check connection
-if (!$_GLOBALS["conn"]) die($_GLOBALS["PROJECT_NAME"] . "Error: connection failed..\n");
+if (!$_GLOBALS["conn"]) die($_GLOBALS["PROJECT_NAME"] . "Error: connection failed.\n");
 if ($_GLOBALS["conn"]->connect_error)
     die($_GLOBALS["PROJECT_NAME"] . "Error: connection failed - " . $_GLOBALS["conn"]->connect_error . "\n");
 echo "Connected successfully\n";
