@@ -807,3 +807,13 @@ getLocalVariables()
 OUTPUT
 {}
 
+NAME
+set reference null on delete
+INPUT
+User deleteThisUser = new User("fake account", 120150815081231, null, null);
+Post postWithNoOwner = new Post("Post-it", deleteThisUser);
+deleteAllObjects(User);
+y
+postWithNoOwner.owner
+OUTPUT
+null

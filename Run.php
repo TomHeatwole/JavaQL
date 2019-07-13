@@ -252,12 +252,18 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         if (!$rebuild) {
             $var_map = dict[];
             $query = "CREATE TABLE " . $class_name . " (_id int NOT NULL AUTO_INCREMENT";
+            $suffix = "";
             foreach ($vars as $var) {
                 $var_map[$var["name"]] = $var["type"];
-                $sql_column = get_sql_column($_GLOBALS, $var["type"], $var["name"]);
-                $query .= ", " . $sql_column["name"] . " " . $sql_column["type"];
+                $col = get_sql_column($_GLOBALS, $var["type"], $var["name"]);
+                $query .= ", " . $col["name"] . " " . $col["type"];
+                if (!is_primitive($_GLOBALS, $var["type"])) {
+                    $ref_table = ($var["type"] instanceof ListType) ? "_list" : $var["type"];
+                    $suffix .= ", FOREIGN KEY (" . $col["name"] .
+                        ") REFERENCES " . $ref_table . "(_id) ON DELETE SET NULL";
+                }
             }
-            if (!mysqli_query($_GLOBALS["conn"], $query . ", PRIMARY KEY(_id))")) {
+            if (!mysqli_query($_GLOBALS["conn"], $query . $suffix . ", PRIMARY KEY(_id))")) {
                 return error($_GLOBALS["MYSQL_ERROR"]);
             }
             $class_map = map_add_lexo($_GLOBALS["class_map"], $class_name, new Map($var_map));
