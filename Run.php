@@ -74,8 +74,8 @@ for (;;) {
     for ($i = 0; $i < count($_GLOBALS["query_queue"]); $i++) {
         $query_pieces = $_GLOBALS["query_queue"][$i];
         for ($j = 0; $j < count($query_pieces); $j++)
-            // TODO: use QR instead of int here. It's absurd that I'm not already doing this.
-            if (is_int($query_pieces[$j])) $query_pieces[$j] = $query_results[$query_pieces[$j]][0];
+            if ($query_pieces[$j] instanceof QueryResult)
+                $query_pieces[$j] = $query_results[$query_pieces[$j]->q_num][0];
         if (!$result = mysqli_query($_GLOBALS["conn"], implode($query_pieces))) {
             error($_GLOBALS["MYSQL_ERROR"]);
             // echo implode($query_pieces); // For debugging
@@ -148,7 +148,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         $query = "SELECT * FROM " . $param["type"] . " WHERE _ID=";
         if ($param["value"] instanceof QueryResult) {
             $query_pieces = vec[$query];
-            $query_pieces[] = $param["value"]->q_num;
+            $query_pieces[] = $param["value"];
             $_GLOBALS["query_queue"][] = $query_pieces;
             $_GLOBALS["print_qr"]["qr_num"] = count($_GLOBALS["query_queue"]) - 1;
             $_GLOBALS["print_qr"]["class_name"] = $param["type"];
@@ -402,7 +402,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
             if ($set_val === null) $set_val = "null";
             if ($set_val instanceof QueryResult) {
                 $query_pieces = vec[$query];
-                $query_pieces[] = $set_val->q_num;
+                $query_pieces[] = $set_val;
                 $query_pieces[] = " WHERE _id=" . $d["parent"]["value"];
                 $_GLOBALS["query_queue"][] = $query_pieces;
             } else if (!mysqli_query($_GLOBALS["conn"], $query . $set_val .
@@ -446,7 +446,7 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, bool $ref) 
     for ($j = 0; $j < count($var_types); $j++) {
         if ($var_values[$j] instanceof QueryResult) {
             $query_pieces[] = $query . ", ";
-            $query_pieces[] = $var_values[$j]->q_num;
+            $query_pieces[] = $var_values[$j];
             $query = "";
         } else $query .= ", " . (($var_values[$j] === null) ? "null" : $var_values[$j]);
     }
@@ -480,7 +480,7 @@ function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line) {
     $cols .= ($sql_type === "int")
         ? ", FOREIGN KEY (value) REFERENCES " . $subtype_table . "(_id) ON DELETE SET NULL)"
         : ")";
-    $_GLOBALS["query_queue"][] = vec["CREATE TABLE _list_", $ret["value"]->q_num, $cols];
+    $_GLOBALS["query_queue"][] = vec["CREATE TABLE _list_", $ret["value"], $cols];
     return $ret;
 }
 
@@ -529,7 +529,7 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
         $parent = shape("type" => $type, "value" => $value);
         $type = $class_var_type;
         if ($value instanceof QueryResult) {
-            $_GLOBALS["query_queue"][] = [$query, $value->q_num];
+            $_GLOBALS["query_queue"][] = [$query, $value];
             $value = new QueryResult(count($_GLOBALS["query_queue"]) - 1);
         } else {
             $result = mysqli_query($_GLOBALS["conn"], $query . $value);
@@ -693,7 +693,7 @@ function display($_GLOBALS, $type, $val) {
     if ($val instanceof QueryResult) {
         $_GLOBALS["print_qr"]["print_type"] = "display";
         $_GLOBALS["print_qr"]["class_name"] = $type;
-        $_GLOBALS["print_qr"]["qr_num"] = $val->q_num;
+        $_GLOBALS["print_qr"]["qr_num"] = count($_GLOBALS["query_queue"]) - 1;
         return true;
     } else return success(get_display_val($_GLOBALS, $type, $val));
 }
@@ -1083,7 +1083,7 @@ function increment_ref_count(dict $_GLOBALS, $id) {
     $query = "UPDATE _list SET ref_count = ref_count + 1 WHERE _id=";
     // TODO: Function for check if it's a query result and return appropriate vec for queue
     $_GLOBALS["query_queue"][] = ($id instanceof QueryResult)
-        ? vec[$query, $id->q_num]
+        ? vec[$query, $id]
         : vec[$query . $id];
 }
 
