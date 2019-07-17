@@ -55,6 +55,7 @@ $_GLOBALS["class_map"] = new Map($class_map);
 $_GLOBALS["symbol_table"] = new Map();
 
 collect_garbo($_GLOBALS);
+// destroy_all_lists($_GLOBALS); // For debugging
 
 // Begin CLI 
 for (;;) {
@@ -73,6 +74,7 @@ for (;;) {
     for ($i = 0; $i < count($_GLOBALS["query_queue"]); $i++) {
         $query_pieces = $_GLOBALS["query_queue"][$i];
         for ($j = 0; $j < count($query_pieces); $j++)
+            // TODO: use QR instead of int here. It's absurd that I'm not already doing this.
             if (is_int($query_pieces[$j])) $query_pieces[$j] = $query_results[$query_pieces[$j]][0];
         if (!$result = mysqli_query($_GLOBALS["conn"], implode($query_pieces))) {
             error($_GLOBALS["MYSQL_ERROR"]);
@@ -90,9 +92,19 @@ for (;;) {
             "value" => $query_results[$assign["q_num"]][0],
         );
     $print_qr = $_GLOBALS["print_qr"];
-    if (count($print_qr) > 0)
-        // TODO: Can we always keep this as single_ ?
-        success(single_query_result_to_string($_GLOBALS, $query_results[$print_qr["qr_num"]], $print_qr["class_name"]));
+    if (count($print_qr) > 0) {
+        switch ($print_qr["print_type"]) {
+            //TODO: enum if there ends up being more of these cases
+        case "single":
+            success(single_query_result_to_string($_GLOBALS,
+                $query_results[$print_qr["qr_num"]], $print_qr["class_name"]));
+            break;
+        case "display":
+            success(get_display_val_for_db_result($_GLOBALS,
+                $print_qr["class_name"], $query_results[$print_qr["qr_num"]][0]));
+            break;
+        }
+    }
 }
 
 function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
@@ -140,6 +152,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
             $_GLOBALS["query_queue"][] = $query_pieces;
             $_GLOBALS["print_qr"]["qr_num"] = count($_GLOBALS["query_queue"]) - 1;
             $_GLOBALS["print_qr"]["class_name"] = $param["type"];
+            $_GLOBALS["print_qr"]["print_type"] = "single";
             return true;
         }
         if (!$result = mysqli_query($_GLOBALS["conn"], "SELECT * FROM "
@@ -230,7 +243,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
             }
             $type = $lex[$i++]["value"];
             if ($type === "List") {
-                if (!($subtype = parse_list_subtype($_GLOBALS, $lex, &$i, "", $line))) return false;
+                if (!($subtype = parse_list_subtype($_GLOBALS, $lex, &$i, $line))) return false;
                 $type = new ListType($subtype, 0);
             }
             if (!$_GLOBALS["ALL_IDS"]->contains($lex[$i]["type"]))
@@ -340,8 +353,11 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         // TODO: Edit file to reflect change?
         return true;
     case TokenType::NEW_LITERAL:
-        if (!new_object($_GLOBALS, $lex, &$i, $line, "", false)) return false;
-        return must_end($lex, $i, $line);
+        // TODO: Could there be a way to bundle things that should begin with parse_type?
+        $i--;
+        if (!$item = parse_type($_GLOBALS, $lex, &$i, $line, "", false)) return false;
+        if (!must_end($lex, $i, $line)) return false;
+        return display($_GLOBALS, $item["type"], $item["value"]);
     case TokenType::ID:
         // This line must exist for unit tests to run correctly
         if ($lex[0]["value"] == $_GLOBALS["UNIT_TEST"]) return success($_GLOBALS["UNIT_TEST"]);
@@ -349,7 +365,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
     if ($_GLOBALS["JAVA_TYPES"]->containsKey($lex[0]["type"])) {
         $j_type = $_GLOBALS["JAVA_TYPES"][$lex[0]["type"]];
         if ($j_type === "List") {
-            if (!($e = parse_list_subtype($_GLOBALS, $lex, &$i, "", $line))) return false;
+            if (!($e = parse_list_subtype($_GLOBALS, $lex, &$i, $line))) return false;
             $e = new ListType($e, 0);
         }
         else $e = ($j_type === "class") ? $lex[0]["value"] : $j_type;
@@ -403,16 +419,13 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
 }
 
 // return false or type & value of new object
-function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref) {
+function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, bool $ref) {
     $class_map = $_GLOBALS["class_map"];
     if ($lex[$i]["type"] === TokenType::J_LIST) {
-        if (!($e instanceof ListType) && $e !== "") return expected_but_found_literal($lex[$i], $line, "List");
         $i++;
-        return new_list($_GLOBALS, $lex, &$i, $line, $e, (int)$ref);
+        return new_list($_GLOBALS, $lex, &$i, $line);
     }
     if (!($class_name = must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return false;
-    if ($e !== "" && $e !== $class_name)
-        return expected_but_found_literal($lex[$i], $line, $e);
     if (!must_match($_GLOBALS, $lex, ++$i, $line, TokenType::L_PAREN)) return false;
     $var_types = $class_map[$class_name]->toValuesArray();
     $var_values = vec[];
@@ -444,8 +457,8 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $r
     return shape("value" => $qr, "type" => $class_name);
 }
 
-function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, int $ref_count) {
-    if (!($subtype = parse_list_subtype($_GLOBALS, $lex, &$i, $e, $line))) return false;
+function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line) {
+    if (!($subtype = parse_list_subtype($_GLOBALS, $lex, &$i, $line))) return false;
     // TODO: copy constructor
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
     $size = 0;
@@ -456,7 +469,7 @@ function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, int $ref_
         $subtype_table = "_list";
         $sql_type = "int";
     } else $sql_type = $_GLOBALS["PRIM"]->contains($subtype) ? $_GLOBALS["TO_SQL_TYPE_MAP"][$subtype] : "int";
-    $insert_values = vec["default", list_subtype_to_sql($subtype), $size, $ref_count];
+    $insert_values = vec["default", list_subtype_to_sql($subtype), $size, 0];
     $_GLOBALS["query_queue"][] = vec["INSERT INTO _list VALUES (" . implode(", ", $insert_values) . " )"];
     $_GLOBALS["query_queue"][] = vec["SELECT LAST_INSERT_ID()"];
     $ret = shape(
@@ -475,18 +488,15 @@ function list_subtype_to_sql($subtype): string {
     return add_quotes($subtype instanceof ListType ? "_L" . $subtype->dim . $subtype->subtype : $subtype);
 }
 
-function parse_list_subtype(dict $_GLOBALS, vec $lex, int &$i, $e, string $line) {
-    if ($e instanceof ListType) $e = $e->inner(); // Allows e to remain ""
+function parse_list_subtype(dict $_GLOBALS, vec $lex, int &$i, string $line) {
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::LT)) return false;
     if (!$_GLOBALS["JAVA_TYPES"]->containsKey($lex[$i]["type"]))
         return expected_but_found($_GLOBALS, $lex[$i], $line, "type");
     $subtype = $lex[$i++]["value"];
     if ($subtype === "List") {
-        if ($e instanceof ListType || $e === "") {
-            if (!($subtype = parse_list_subtype($_GLOBALS, $lex, &$i, $e, $line))) return false;
+            if (!($subtype = parse_list_subtype($_GLOBALS, $lex, &$i, $line))) return false;
             $subtype = new ListType($subtype, 0);
-        } else return expected_but_found($_GLOBALS, $lex[$i - 1], $line, $e);
-    } else if ($subtype !== $e && $e !== "") return expected_but_found($_GLOBALS, $lex[$i - 1], $line, $e);
+    }
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::GT)) return false;
     return $subtype;
 }
@@ -515,14 +525,20 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
         $class_var_type = $_GLOBALS["class_map"][$type][$lex[$i]["value"]];
         $is_primitive = is_primitive($_GLOBALS, $class_var_type);
         $row_name = $is_primitive ? $lex[$i]["value"] : java_ref_to_mysql($class_var_type, $lex[$i]["value"]); 
-        $result = mysqli_query($_GLOBALS["conn"], "SELECT " . $row_name . " FROM " . $type . " WHERE _id=" . $value);
-        if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
+        $query = "SELECT " . $row_name . " FROM " . $type . " WHERE _id=";
         $parent = shape("type" => $type, "value" => $value);
-        $value = mysqli_fetch_row($result)[0];
         $type = $class_var_type;
-        if ($type === "String") $value = add_quotes($value);
-        else if ($type === "char") $value = "'" . $value . "'";
-        // TODO: if we're on a list check for a .get or []
+        if ($value instanceof QueryResult) {
+            $_GLOBALS["query_queue"][] = [$query, $value->q_num];
+            $value = new QueryResult(count($_GLOBALS["query_queue"]) - 1);
+        } else {
+            $result = mysqli_query($_GLOBALS["conn"], $query . $value);
+            if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
+            $value = mysqli_fetch_row($result)[0];
+            if ($type === "String") $value = add_quotes($value);
+            else if ($type === "char") $value = "'" . $value . "'";
+        }
+        // TODO: list check for a .get or [] could be moved here?
         if ($lex[++$i]["type"] !== TokenType::DOT || $is_primitive) break;
     }
     return shape("parent" => $parent, "value" => $value, "type" => $type, "row_name" => $row_name);
@@ -530,30 +546,30 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
 
 // return sym if parsed correctly or false otherwise
 function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref) {
-    // TODO: Implement default
-    $token = $lex[$i++];
-    switch($token["type"]) {
-    case TokenType::NEW_LITERAL:
-        return ($val = new_object($_GLOBALS, $lex, &$i, $line, $e, $ref)) ? $val : false;
-    case TokenType::LIST_ID:
-        //TODO: check for .get or [] or whatever
-        $sym = $_GLOBALS["symbol_table"][$token["value"]];
-        if ($e === "" || $e == $sym["type"]) {
-            if ($ref) increment_ref_count($_GLOBALS, $sym["value"]);
-            return $sym;
-        }
-        return ($e instanceof ListType)
-            ? expected_but_found_list($sym["type"], $token, $line, $e)
-            : expected_but_found($_GLOBALS, $token, $line, $e);
-    case TokenType::OBJ_ID:
-        $sym = $_GLOBALS["symbol_table"][$token["value"]];
-        if ($lex[$i]["type"] === TokenType::DOT) {
+    $first_token = $lex[$i++];
+    if (!($sym = parse_first_type($_GLOBALS, $lex, &$i, $line, $e, $ref, $first_token))) return false;
+    if (is_primitive($_GLOBALS, $sym["type"])) return $sym;
+    for (;;) {
+        if ($lex[$i]["type"] === TokenType::DOT || $lex[$i]["type"] === TokenType::L_BRACKIE) {
             $i++;
             if (!$sym = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line)) return false;
-            if ($sym["type"] instanceof ListType && $ref) increment_ref_count($_GLOBALS, $sym["value"]);
+            continue;
         }
-        if ($sym["type"] == $e || $e === "") return $sym;
-        return expected_but_found($_GLOBALS, $token, $line, $e);
+        break;
+    }
+    if ($sym["type"] != $e && $e !== "") return error("cannot convert " . $sym["type"] . " to " . $e);
+    if ($sym["type"] instanceof ListType && $ref) increment_ref_count($_GLOBALS, $sym["value"]);
+    return $sym;
+}
+
+function parse_first_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref, $token) {
+    // TODO: move away from $e for uniofrm "can't convert" error messages
+    // TODO: Implement default
+    switch($token["type"]) {
+    case TokenType::NEW_LITERAL:
+        return ($val = new_object($_GLOBALS, $lex, &$i, $line, $ref)) ? $val : false;
+    case TokenType::LIST_ID: return $_GLOBALS["symbol_table"][$token["value"]];
+    case TokenType::OBJ_ID: return $_GLOBALS["symbol_table"][$token["value"]];
     case TokenType::BOOLEAN_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["boolean"]));
     case TokenType::CHAR_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["char", "String"]));
     case TokenType::STRING_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["String"]));
@@ -568,6 +584,7 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $r
     case TokenType::LONG_ID:
         return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["long", "float", "double"]));
     }
+    // TODO: refactor? Second method for tables?
     if ($e === "") return unexpected_token($token, $line);
     switch($token["type"]) {
     case TokenType::INT_LITERAL:
@@ -656,6 +673,10 @@ function single_query_result_to_string(dict $_GLOBALS, $result, string $class_na
     return json_encode($vars, JSON_PRETTY_PRINT);
 }
 
+function get_display_val_for_db_result(dict $_GLOBALS, $type, $val) {
+    return ($type === "String") ? add_quotes($val) : get_display_val($_GLOBALS, $type, $val);
+}
+
 function get_display_val(dict $_GLOBALS, $type, $val) {
     if ($type === "boolean") return $val && $val !== "false" ? "true" : "false";
     if ($type === "double" || $type === "float") {
@@ -666,6 +687,15 @@ function get_display_val(dict $_GLOBALS, $type, $val) {
     if (!is_primitive($_GLOBALS, $type))
         return $val === null ? "null" : $type . "@" . $val;
     return $val;
+}
+
+function display($_GLOBALS, $type, $val) {
+    if ($val instanceof QueryResult) {
+        $_GLOBALS["print_qr"]["print_type"] = "display";
+        $_GLOBALS["print_qr"]["class_name"] = $type;
+        $_GLOBALS["print_qr"]["qr_num"] = $val->q_num;
+        return true;
+    } else return success(get_display_val($_GLOBALS, $type, $val));
 }
 
 function is_primitive(dict $_GLOBALS, $type) {
@@ -1050,7 +1080,11 @@ function decrement_ref_count(dict $_GLOBALS, $id) {
 
 function increment_ref_count(dict $_GLOBALS, $id) {
     if ($id === null) return;
-    $_GLOBALS["query_queue"][] = vec["UPDATE _list SET ref_count = ref_count + 1 WHERE _id=" . $id];
+    $query = "UPDATE _list SET ref_count = ref_count + 1 WHERE _id=";
+    // TODO: Function for check if it's a query result and return appropriate vec for queue
+    $_GLOBALS["query_queue"][] = ($id instanceof QueryResult)
+        ? vec[$query, $id->q_num]
+        : vec[$query . $id];
 }
 
 // For debugging

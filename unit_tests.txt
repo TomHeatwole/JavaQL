@@ -17,6 +17,7 @@ getAllObjects(User);
 getAllObjects(Prims);
 getAllObjects(Post);
 OUTPUT
+User@#
 []
 []
 []
@@ -29,6 +30,7 @@ deleteAllObjects(User);
 no
 getAllObjects(User);
 OUTPUT
+User@#
 [
     {
         "username": "I_HATE_YEXT",
@@ -187,6 +189,9 @@ new Post("post office", new User("mailman", 13581501231231415, null, null));
 new Post("shitpost", null);
 getAllObjects(Post);
 OUTPUT
+Post@#
+Post@#
+Post@#
 [
     {
         "content": "fence post",
@@ -391,9 +396,7 @@ new object fails on wrong constructor
 INPUT
 User notAUser = new Post("Post Malone", null);
 OUTPUT
-User notAUser = new Post("Post Malone", null);
-                    ^
-Error: expected "User" but found "Post"
+Error: cannot convert Post to User
 
 NAME
 new object fails on bad parameters
@@ -464,6 +467,7 @@ Post setUserNull = new Post("Post request", userParam);
 User nullUser;
 setUserNull.owner = nullUser;
 OUTPUT
+Prims@#
 
 NAME
 parse type fail on ids
@@ -483,9 +487,7 @@ new Prims("", floatID
               ^
 Error: expected byte but found float variable
 Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
-new Post("New York Post", postID);
-                          ^
-Error: expected User but found Object variable
+Error: cannot convert Post to User
 Post constructor expects the following parameters: (String content, User owner)
 
 NAME
@@ -534,6 +536,7 @@ new Prims("", 0, 0, -2200000000, 0, 0, 0, 'a', false);
                     ^
 Error: integer value -2200000000 is too large for type int
 Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
+Prims@#
 float tooLarge1 = 3.5e900;
                   ^
 Error: decimal literal is too large
@@ -608,6 +611,7 @@ lexer skips whitespace
 INPUT
         new   Post      ("Post-it note"  , null)    ;          
 OUTPUT
+Post@#
 
 NAME
 lexer ignores inline comment
@@ -699,18 +703,12 @@ List<Post> badList2 = new List();
 List<List<Post>> badList3 = new List<Post>();
 List<Post> badList4 = new List<List<Post>>();
 OUTPUT
-List<int> badList1 = new List<Post>();
-                              ^
-Error: expected int but found class name
+Error: cannot convert List<Post> to List<int>
 List<Post> badList2 = new List();
                               ^
 Error: expected < but found (
-List<List<Post>> badList3 = new List<Post>();
-                                     ^
-Error: expected List<Post> but found class name
-List<Post> badList4 = new List<List<Post>>();
-                               ^
-Error: expected Post but found List
+Error: cannot convert List<Post> to List<List<Post>>
+Error: cannot convert List<List<Post>> to List<Post>
 
 NAME
 local list init success
@@ -761,16 +759,10 @@ List<List<List<int>>> tripleList = new List<List<List<int>>>();
 Favorites fave2 = new Favorites(null, null, null, tripleList, null);
 Favorites fave3 = new Favorites(null, null, tripleList, new List<List<Prims>>(), null);
 OUTPUT
-fave1.posts = new List<int>();
-                       ^
-Error: expected Post but found int
-Favorites fave2 = new Favorites(null, null, null, tripleList, null);
-                                                  ^
-Error: expected List<List<List<Prims>>> but found List<List<List<int>>>
+Error: cannot convert List<int> to List<Post>
+Error: cannot convert List<List<List<int>>> to List<List<List<Prims>>>
 Favorites constructor expects the following parameters: (List<Post> posts, List<String> comments, List<List<List<int>>> tripleList, List<List<List<Prims>>> triplePrims, User owner)
-Favorites fave3 = new Favorites(null, null, tripleList, new List<List<Prims>>(), null);
-                                                                      ^
-Error: expected List<Prims> but found class name
+Error: cannot convert List<List<Prims>> to List<List<List<Prims>>>
 Favorites constructor expects the following parameters: (List<Post> posts, List<String> comments, List<List<List<int>>> tripleList, List<List<List<Prims>>> triplePrims, User owner)
 
 NAME
