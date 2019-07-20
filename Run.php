@@ -86,11 +86,12 @@ for (;;) {
     }
     if ($quit) continue;
     $assign = $_GLOBALS["assign"];
-    if (count($assign) > 0)
+    if (count($assign) > 0) {
         $_GLOBALS["symbol_table"][$assign["name"]] = shape(
             "type" => $assign["type"],
-            "value" => $query_results[$assign["q_num"]][0],
+            "value" => format_mysql_value($_GLOBALS, $assign["type"], $query_results[$assign["q_num"]][0])
         );
+    }
     $print_qr = $_GLOBALS["print_qr"];
     if (count($print_qr) > 0) {
         switch ($print_qr["print_type"]) {
@@ -133,8 +134,8 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         $sym_table = $_GLOBALS["symbol_table"];
         foreach($sym_table->toKeysArray() as $key)
             $print[$key] = $sym_table[$key]["type"] === "String" ?
-                remove_quotes($sym_table[$key]["value"]) :
-                get_display_val($_GLOBALS, $sym_table[$key]["type"], $sym_table[$key]["value"]);
+            remove_quotes($sym_table[$key]["value"]) :
+            get_display_val($_GLOBALS, $sym_table[$key]["type"], $sym_table[$key]["value"]);
         return success(json_encode($print, JSON_PRETTY_PRINT));
     case TokenType::M_GET_VARIABLES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
@@ -494,8 +495,8 @@ function parse_list_subtype(dict $_GLOBALS, vec $lex, int &$i, string $line) {
         return expected_but_found($_GLOBALS, $lex[$i], $line, "type");
     $subtype = $lex[$i++]["value"];
     if ($subtype === "List") {
-            if (!($subtype = parse_list_subtype($_GLOBALS, $lex, &$i, $line))) return false;
-            $subtype = new ListType($subtype, 0);
+        if (!($subtype = parse_list_subtype($_GLOBALS, $lex, &$i, $line))) return false;
+        $subtype = new ListType($subtype, 0);
     }
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::GT)) return false;
     return $subtype;
@@ -536,7 +537,7 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
             if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
             $value = mysqli_fetch_row($result)[0];
             if ($type === "String") $value = add_quotes($value);
-            else if ($type === "char") $value = "'" . $value . "'";
+            else if ($type === "char") $value = add_single_quotes($value);
         }
         // TODO: list check for a .get or [] could be moved here?
         if ($lex[++$i]["type"] !== TokenType::DOT || $is_primitive) break;
@@ -674,7 +675,8 @@ function single_query_result_to_string(dict $_GLOBALS, $result, string $class_na
 }
 
 function get_display_val_for_db_result(dict $_GLOBALS, $type, $val) {
-    return ($type === "String") ? add_quotes($val) : get_display_val($_GLOBALS, $type, $val);
+    $val = format_mysql_value($_GLOBALS, $type, $val);
+    return get_display_val($_GLOBALS, $type, $val);
 }
 
 function get_display_val(dict $_GLOBALS, $type, $val) {
@@ -709,6 +711,10 @@ function remove_quotes(string $val) : string {
 
 function add_quotes(string $val) : string {
     return "\"" . $val . "\"";
+}
+
+function add_single_quotes(string $val) {
+    return "'" . $val . "'";
 }
 
 function r_paren_semi(dict $_GLOBALS, $lex, int $i, string $line): boolean {
@@ -777,10 +783,20 @@ function get_sql_column(dict $_GLOBALS, $type, string $name): shape("type" => st
         : shape("type" => "int", "name" => java_ref_to_mysql($type, $name));
 }
 
-function mysql_ref_to_java(string $name) {
-    if ($name[1] === "L") {
-        return mysql_list_to_java($name);
+function format_mysql_value(dict $_GLOBALS, $type, $value) {
+    switch ($type) {
+    case "String":
+        $value = add_quotes($value);
+        break;
+    case "char":
+        $value = add_single_quotes($value);
+        break;
     }
+    return $value;
+}
+
+function mysql_ref_to_java(string $name) {
+    if ($name[1] === "L") return mysql_list_to_java($name);
     $table_name_length = $name[1];
     for ($i = 2; is_numeric($name[$i]); $i++) $table_name_length .= $name[$i];
     return shape(
@@ -992,7 +1008,7 @@ function lex_line(dict $_GLOBALS, vec $ret, string $line, int $line_num, boolean
         // Comments
         } else if ($line[$i] === "/") {
             if ($i + 1 === strlen($line) || ($line[++$i] !== "/" && $line[$i] !== "*"))
-               return carrot_and_error("unrecognized symbol: /", $line, $i - 1);
+                return carrot_and_error("unrecognized symbol: /", $line, $i - 1);
             if ($line[$i] === "/") break; // Rest of line is comment
             $comment = true; // /* comment has begun
 

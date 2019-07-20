@@ -507,7 +507,6 @@ new Prims("", 0, 0, 0, 0, 999999999999999999999999999999999999999999999999, 0, '
 new Prims("", 0, 0, 0, 0, 0, -99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999, 'a', false);
 new Prims("", 128, 0, 0, 0, 0, 0, 'a', false);
 new Prims("", 0, 0, -2200000000, 0, 0, 0, 'a', false);
-new Prims("", 0, 0, 0, 0, 0, 0, 'a', false);
 float tooLarge1 = 3.5e900;
 float tooLarge2 = -3.5e200;
 float tooLarge3 = 3e500;
@@ -536,7 +535,6 @@ new Prims("", 0, 0, -2200000000, 0, 0, 0, 'a', false);
                     ^
 Error: integer value -2200000000 is too large for type int
 Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
-Prims@#
 float tooLarge1 = 3.5e900;
                   ^
 Error: decimal literal is too large
@@ -809,3 +807,14 @@ y
 postWithNoOwner.owner
 OUTPUT
 null
+
+NAME
+dereference new command success
+INPUT
+new Post("Post mortem", new User("depression", 12512512528, null, new Prims("", 0, 0, 0, 0, 0, 0, 'q', false))).owner.data.c;
+String postContent = new Post("postal", null).content;
+postContent
+OUTPUT
+'q'
+"postal"
+
