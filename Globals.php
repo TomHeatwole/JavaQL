@@ -311,6 +311,14 @@ $_GLOBALS = dict[
         "." => TokenType::DOT,
         "," => TokenType::COMMA,
     ]),
+    "ALL_LITERALS" => new Set(vec[
+        TokenType::INT_LITERAL,
+        TokenType::FLOAT_LITERAL,
+        TokenType::BOOLEAN_LITERAL,
+        TokenType::STRING_LITERAL,
+        TokenType::CHAR_LITERAL,
+        TokenType::NULL_LITERAL
+    ]),
     "PRIM" => new Set(vec["short", "byte", "int", "long", "float", "double", "char", "boolean", "String"]), // JavaQL primitives
     "INT_MAX" => new Map(dict[
         "byte" => 127,

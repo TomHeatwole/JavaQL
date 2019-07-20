@@ -548,6 +548,8 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
 // return sym if parsed correctly or false otherwise
 function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref) {
     $first_token = $lex[$i++];
+    if ($_GLOBALS["ALL_LITERALS"]->contains($first_token["type"]))
+        return parse_literal($_GLOBALS, $first_token, $line, $e);
     if (!($sym = parse_first_type($_GLOBALS, $lex, &$i, $line, $e, $ref, $first_token))) return false;
     if (is_primitive($_GLOBALS, $sym["type"])) return $sym;
     for (;;) {
@@ -585,7 +587,10 @@ function parse_first_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, b
     case TokenType::LONG_ID:
         return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["long", "float", "double"]));
     }
-    // TODO: refactor? Second method for tables?
+    return unexpected_token($token, $line);
+}
+
+function parse_literal(dict $_GLOBALS, $token, string $line, $e) {
     if ($e === "") return unexpected_token($token, $line);
     switch($token["type"]) {
     case TokenType::INT_LITERAL:
@@ -637,8 +642,8 @@ function parse_first_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, b
         return (is_primitive($_GLOBALS, $e))
             ? expected_but_found($_GLOBALS, $token, $line, $e)
             : shape("value" => null, "type" => $e);
-    default: return expected_but_found($_GLOBALS, $token, $line, $e);
     }
+    return false; // This sound theoretically be unreachable
 }
 
 function parse_id($_GLOBALS, $token, $line, $e, Set $accept) {
