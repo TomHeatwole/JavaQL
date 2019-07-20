@@ -101,7 +101,7 @@ for (;;) {
                 $query_results[$print_qr["qr_num"]], $print_qr["class_name"]));
             break;
         case "display":
-            success(get_display_val_for_db_result($_GLOBALS,
+            success(get_display_value_for_db_result($_GLOBALS,
                 $print_qr["class_name"], $query_results[$print_qr["qr_num"]][0]));
             break;
         }
@@ -135,7 +135,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         foreach($sym_table->toKeysArray() as $key)
             $print[$key] = $sym_table[$key]["type"] === "String" ?
             remove_quotes($sym_table[$key]["value"]) :
-            get_display_val($_GLOBALS, $sym_table[$key]["type"], $sym_table[$key]["value"]);
+            get_display_value($_GLOBALS, $sym_table[$key]["type"], $sym_table[$key]["value"]);
         return success(json_encode($print, JSON_PRETTY_PRINT));
     case TokenType::M_GET_VARIABLES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
@@ -393,20 +393,20 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
             if (!($d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line))) return false;
             if ($end = check_end($lex, $i, $line)) {
                 if ($end === -1) return false;
-                return success(get_display_val($_GLOBALS, $d["type"], $d["value"]));
+                return success(get_display_value($_GLOBALS, $d["type"], $d["value"]));
             }
             if (!must_match_unexpected($lex, $i++, $line, TokenType::ASSIGN)) return false;
-            if (!($set_val = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"], true))) return false;
+            if (!($set_value = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"], true))) return false;
             else if (!must_end($lex, $i, $line)) return false;
-            $set_val = $set_val["value"];
+            $set_value = $set_value["value"];
             $query = "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=";
-            if ($set_val === null) $set_val = "null";
-            if ($set_val instanceof QueryResult) {
+            if ($set_value === null) $set_value = "null";
+            if ($set_value instanceof QueryResult) {
                 $query_pieces = vec[$query];
-                $query_pieces[] = $set_val;
+                $query_pieces[] = $set_value;
                 $query_pieces[] = " WHERE _id=" . $d["parent"]["value"];
                 $_GLOBALS["query_queue"][] = $query_pieces;
-            } else if (!mysqli_query($_GLOBALS["conn"], $query . $set_val .
+            } else if (!mysqli_query($_GLOBALS["conn"], $query . $set_value .
                 " WHERE _id=" . $d["parent"]["value"])) return error($_GLOBALS["MYSQL_ERROR"]);
             if ($d["type"] instanceof ListType) decrement_ref_count($_GLOBALS, $d["value"]);
             return true;
@@ -414,7 +414,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         if ($lex[$i]["type"] === TokenType::ASSIGN)
             return assign($_GLOBALS, $lex, ++$i, $sym["type"], $line, $lex[0]["value"]);
         if (!must_end($lex, $i, $line)) return false;
-        return success(get_display_val($_GLOBALS, $sym["type"], $sym["value"]));
+        return success(get_display_value($_GLOBALS, $sym["type"], $sym["value"]));
     }
     return unexpected_token($lex[0], $line);
 }
@@ -432,13 +432,13 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, bool $ref) 
     $var_values = vec[];
     $i++;
     for ($j = 0; $j < count($var_types); $j++) {
-        if (!($var_val = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j], true))) {
+        if (!($var_value = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j], true))) {
             echo $class_name, " constructor expects the following parameters: (";
             $var_names = $class_map[$class_name]->toKeysArray();
             for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
             return fail($var_types[count($var_names) - 1] . " " . $var_names[count($var_names) - 1] . ")");
         }
-        $var_values[] = $var_val["value"];
+        $var_values[] = $var_value["value"];
         if ($j + 1 < count($var_types) && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return false;
     }
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
@@ -503,15 +503,15 @@ function parse_list_subtype(dict $_GLOBALS, vec $lex, int &$i, string $line) {
 }
 
 function assign(dict $_GLOBALS, vec $lex, int $i, $e, string $line, string $name): boolean {
-    if (!($val = parse_type($_GLOBALS, $lex, &$i, $line, $e, false))) return false;
-    $val = $val["value"];
+    if (!($value = parse_type($_GLOBALS, $lex, &$i, $line, $e, false))) return false;
+    $value = $value["value"];
     if (!must_end($lex, $i, $line)) return false;
-    if ($val instanceof QueryResult) {
+    if ($value instanceof QueryResult) {
         $_GLOBALS["assign"]["name"] = $name;
-        $_GLOBALS["assign"]["q_num"] = $val->q_num;
+        $_GLOBALS["assign"]["q_num"] = $value->q_num;
         $_GLOBALS["assign"]["type"] = $e;
     }
-    else $_GLOBALS["symbol_table"][$name] = shape("type" => $e, "value" => $val);
+    else $_GLOBALS["symbol_table"][$name] = shape("type" => $e, "value" => $value);
     return true;
 }
 
@@ -568,7 +568,7 @@ function parse_first_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, b
     // TODO: Implement default
     switch($token["type"]) {
     case TokenType::NEW_LITERAL:
-        return ($val = new_object($_GLOBALS, $lex, &$i, $line, $ref)) ? $val : false;
+        return ($value = new_object($_GLOBALS, $lex, &$i, $line, $ref)) ? $value : false;
     case TokenType::LIST_ID: return $_GLOBALS["symbol_table"][$token["value"]];
     case TokenType::OBJ_ID: return $_GLOBALS["symbol_table"][$token["value"]];
     case TokenType::BOOLEAN_ID: return parse_id($_GLOBALS, $token, $line, $e, new Set(vec["boolean"]));
@@ -589,7 +589,7 @@ function parse_first_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, b
     if ($e === "") return unexpected_token($token, $line);
     switch($token["type"]) {
     case TokenType::INT_LITERAL:
-        $int_val = (int)$token["value"];
+        $int_value = (int)$token["value"];
         if ($e === "float") {
             if (doubleval($token["value"]) <= $_GLOBALS["FLOAT_MAX"]
                 && doubleval($token["value"] >= -$_GLOBALS["FLOAT_MAX"]))
@@ -605,24 +605,24 @@ function parse_first_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, b
             $max = $_GLOBALS["INT_MAX"][$e];
             $too_long = false;
             if ($e === "long") {
-                if ($int_val === $max && int_trim_zeros($token["value"]) !== "" . $max) $too_long = true;
-                else if (-$int_val === $max + 1 && int_trim_zeros($token["value"]) !== "" . (-$max - 1)) $too_long = true;
-            } else if ($int_val > $max || -$int_val > $max + 1) $too_long = true;
+                if ($int_value === $max && int_trim_zeros($token["value"]) !== "" . $max) $too_long = true;
+                else if (-$int_value === $max + 1 && int_trim_zeros($token["value"]) !== "" . (-$max - 1)) $too_long = true;
+            } else if ($int_value > $max || -$int_value > $max + 1) $too_long = true;
             return $too_long ? carrot_and_error("integer value " . $token["value"] .
                 " is too large for type " . $e, $line, $token["char_num"]) 
                 : shape("value" => intval($token["value"]), "type" => $e);
         }
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::FLOAT_LITERAL:
-        $double_val = doubleval($token["value"]);
-        if ($double_val === INF || $double_val === -INF)
+        $double_value = doubleval($token["value"]);
+        if ($double_value === INF || $double_value === -INF)
             return carrot_and_error("decimal literal is too large", $line, $token["char_num"]);
         if ($e === "float") {
-            if ($double_val > $_GLOBALS["FLOAT_MAX"] || $double_val < -$_GLOBALS["FLOAT_MAX"])
+            if ($double_value > $_GLOBALS["FLOAT_MAX"] || $double_value < -$_GLOBALS["FLOAT_MAX"])
                 return carrot_and_error("decimal literal is too large for type float", $line, $token["char_num"]);
             return shape("value" => floatval($token["value"]), "type" => $e);
         }
-        if ($e === "double") return shape("value" => $double_val, "type" => $e);
+        if ($e === "double") return shape("value" => $double_value, "type" => $e);
         return expected_but_found($_GLOBALS, $token, $line, $e);
     case TokenType::CHAR_LITERAL:
         if ($e === "char") return shape("value" => $token["value"], "type" => $e);
@@ -659,7 +659,7 @@ function query_result_to_string(dict $_GLOBALS, $result, string $class_name): st
     while ($row = mysqli_fetch_row($result)) {
         $vars = dict[];
         for ($i = 1; $i < count($row); $i++)
-            $vars[$var_names[$i - 1]] = get_display_val($_GLOBALS, $var_types[$i - 1], $row[$i]);
+            $vars[$var_names[$i - 1]] = get_display_value($_GLOBALS, $var_types[$i - 1], $row[$i]);
         $print[] = $vars;
     }
     return json_encode($print, JSON_PRETTY_PRINT);
@@ -670,34 +670,34 @@ function single_query_result_to_string(dict $_GLOBALS, $result, string $class_na
     $var_types = $_GLOBALS["class_map"][$class_name]->toValuesArray();
     $vars = dict[];
     for ($i = 1; $i < count($result); $i++)
-        $vars[$var_names[$i - 1]] = get_display_val($_GLOBALS, $var_types[$i - 1], $result[$i]);
+        $vars[$var_names[$i - 1]] = get_display_value($_GLOBALS, $var_types[$i - 1], $result[$i]);
     return json_encode($vars, JSON_PRETTY_PRINT);
 }
 
-function get_display_val_for_db_result(dict $_GLOBALS, $type, $val) {
-    $val = format_mysql_value($_GLOBALS, $type, $val);
-    return get_display_val($_GLOBALS, $type, $val);
+function get_display_value_for_db_result(dict $_GLOBALS, $type, $value) {
+    $value = format_mysql_value($_GLOBALS, $type, $value);
+    return get_display_value($_GLOBALS, $type, $value);
 }
 
-function get_display_val(dict $_GLOBALS, $type, $val) {
-    if ($type === "boolean") return $val && $val !== "false" ? "true" : "false";
+function get_display_value(dict $_GLOBALS, $type, $value) {
+    if ($type === "boolean") return $value && $value !== "false" ? "true" : "false";
     if ($type === "double" || $type === "float") {
-        $val = str_replace("e", "E", $val);
-        $val = str_replace("+", "", $val);
-        return strpos($val, ".") ? $val : $val .= ".0";
+        $value = str_replace("e", "E", $value);
+        $value = str_replace("+", "", $value);
+        return strpos($value, ".") ? $value : $value .= ".0";
     }
     if (!is_primitive($_GLOBALS, $type))
-        return $val === null ? "null" : $type . "@" . $val;
-    return $val;
+        return $value === null ? "null" : $type . "@" . $value;
+    return $value;
 }
 
-function display($_GLOBALS, $type, $val) {
-    if ($val instanceof QueryResult) {
+function display($_GLOBALS, $type, $value) {
+    if ($value instanceof QueryResult) {
         $_GLOBALS["print_qr"]["print_type"] = "display";
         $_GLOBALS["print_qr"]["class_name"] = $type;
         $_GLOBALS["print_qr"]["qr_num"] = count($_GLOBALS["query_queue"]) - 1;
         return true;
-    } else return success(get_display_val($_GLOBALS, $type, $val));
+    } else return success(get_display_value($_GLOBALS, $type, $value));
 }
 
 function is_primitive(dict $_GLOBALS, $type) {
@@ -705,16 +705,16 @@ function is_primitive(dict $_GLOBALS, $type) {
     return $_GLOBALS["PRIM"]->contains($type);
 }
 
-function remove_quotes(string $val) : string {
-    return substr($val, 1, strlen($val) - 2);
+function remove_quotes(string $value) : string {
+    return substr($value, 1, strlen($value) - 2);
 }
 
-function add_quotes(string $val) : string {
-    return "\"" . $val . "\"";
+function add_quotes(string $value) : string {
+    return "\"" . $value . "\"";
 }
 
-function add_single_quotes(string $val) {
-    return "'" . $val . "'";
+function add_single_quotes(string $value) {
+    return "'" . $value . "'";
 }
 
 function r_paren_semi(dict $_GLOBALS, $lex, int $i, string $line): boolean {
@@ -872,9 +872,9 @@ function class_map_print_format(Map $old_map) {
 function map_replace_list_types(Map $old_map) {
     $new_map = new Map();
     foreach ($old_map->toKeysArray() as $key) {
-        $val = $old_map[$key];
-        if ($val instanceof ListType) $val = list_type_to_java($val);
-        $new_map[$key] = $val;
+        $value = $old_map[$key];
+        if ($value instanceof ListType) $value = list_type_to_java($value);
+        $new_map[$key] = $value;
     }
     return $new_map;
 }
@@ -1060,16 +1060,16 @@ function lex_number(string $line, int &$i, bool $decimal) {
     );
 }
 
-function int_trim_zeros(string $val): string {
+function int_trim_zeros(string $value): string {
     $i = 0;
     $prefix = "";
-    if ($val[0] === "-") {
+    if ($value[0] === "-") {
         $i = 1;
         $prefix = '-';
     }
-    for (; $i < strlen($val) - 1; $i++)
-        if ($val[$i] !== "0") break;
-    return $prefix . substr($val, $i);
+    for (; $i < strlen($value) - 1; $i++)
+        if ($value[$i] !== "0") break;
+    return $prefix . substr($value, $i);
 }
 
 function collect_garbo(dict $_GLOBALS) {
