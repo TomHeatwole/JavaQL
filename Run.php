@@ -78,7 +78,7 @@ for (;;) {
                 $query_pieces[$j] = $query_results[$query_pieces[$j]->q_num][0];
         if (!$result = mysqli_query($_GLOBALS["conn"], implode($query_pieces))) {
             error($_GLOBALS["MYSQL_ERROR"]);
-            // echo implode($query_pieces); // For debugging
+            echo implode($query_pieces); // For debugging
             $quit = true;
         }
         if ($quit) break;
@@ -515,8 +515,20 @@ function assign(dict $_GLOBALS, vec $lex, int $i, $e, string $line, string $name
     return true;
 }
 
-function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, string $line) {
-    
+function dereference(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line) {
+    if ($type instanceof ListType) {
+        $list_method = $lex[$i++];
+        switch ($list_method["value"]) {
+            /* TODO
+        case "add":
+            if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
+             */
+        case "get":
+            if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
+            return list_get($_GLOBALS, $type, $value, $lex, &$i, $line, false);
+        }
+        return unexpected_token($list_method, $line);
+    } 
     for (;; $i++) {
         if (!$_GLOBALS["ALL_IDS"]->contains($lex[$i]["type"]))
             return unexpected_token($lex[$i], $line);
@@ -540,23 +552,45 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
             if ($type === "String") $value = add_quotes($value);
             else if ($type === "char") $value = add_single_quotes($value);
         }
-        // TODO: list check for a .get or [] could be moved here?
         if ($lex[++$i]["type"] !== TokenType::DOT || $is_primitive) break;
     }
     return shape("parent" => $parent, "value" => $value, "type" => $type, "row_name" => $row_name);
 }
 
+function list_get(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line, boolean $brackie) {
+    if (!($index = parse_expression($_GLOBALS, $lex, &$i, $line, "int", false))) return false;
+    $index = $index["value"];
+    if (!must_match($_GLOBALS, $lex, $i++, $line, $brackie ? TokenType::R_BRACKIE : TokenType::R_PAREN)) return false;
+    // TODO: Figure out how to check for index out of bounds
+    // TODO: Perhaps [n:m] should be allowed in querying language
+    
+    return shape(
+        "value" => queue_query($_GLOBALS, "SELECT * FROM _list_", $value, " LIMIT " . $index . ",1"),
+        "type" => $type->inner()
+    );
+}
+
+/*
+function list_add(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line) {
+
+}
+ */
+
 // return sym if parsed correctly or false otherwise
 function parse_expression(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref) {
     $first_token = $lex[$i++];
-    if ($_GLOBALS["ALL_LITERALS"]->contains($first_token["type"]))
-        return parse_literal($_GLOBALS, $first_token, $line, $e);
     if (!($sym = parse_first_type($_GLOBALS, $lex, &$i, $line, $e, $ref, $first_token))) return false;
     if (is_primitive($_GLOBALS, $sym["type"])) return $sym;
     for (;;) {
-        if ($lex[$i]["type"] === TokenType::DOT || $lex[$i]["type"] === TokenType::L_BRACKIE) {
+        $follow_type = $lex[$i]["type"];
+        if ($follow_type === TokenType::DOT || $follow_type === TokenType::L_BRACKIE) {
             $i++;
-            if (!$sym = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line)) return false;
+            if ($follow_type === TokenType::DOT)
+                $sym = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line);
+            else if ($sym["type"] instanceof ListType)
+                $sym = list_get($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line, true);
+            else return unexpected_token($lex[$i], $line);
+            if ($sym === false) return false;
             continue;
         }
         break;
@@ -568,6 +602,8 @@ function parse_expression(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, b
 
 function parse_first_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref, $token) {
     // TODO: Implement default
+    if ($_GLOBALS["ALL_LITERALS"]->contains($token["type"]))
+        return parse_literal($_GLOBALS, $token, $line, $e);
     switch($token["type"]) {
     case TokenType::NEW_LITERAL:
         return ($value = new_object($_GLOBALS, $lex, &$i, $line, $ref)) ? $value : false;
@@ -633,6 +669,7 @@ function parse_literal(dict $_GLOBALS, $token, string $line, $e) {
     case TokenType::CHAR_LITERAL:
         if ($e === "char") return shape("value" => $token["value"], "type" => $e);
         return expected_but_found($_GLOBALS, $token, $line, $e);
+        if (!$sym) return false;
     case TokenType::STRING_LITERAL:
         if ($e === "String") return shape("value" => $token["value"], "type" => $e);
         return expected_but_found($_GLOBALS, $token, $line, $e);
@@ -833,6 +870,12 @@ function java_ref_to_mysql($type, string $name): string {
     return ($type instanceof ListType)
         ? "_L" . $type->dim . "_" . strlen($type->subtype) . $type->subtype . $name 
         : "_" . strlen($type) . $type . $name;
+}
+
+function queue_query(dict $_GLOBALS, string $before, $value, string $after) {
+    $_GLOBALS["query_queue"][] =
+        ($value instanceof QueryResult) ? vec[$before, $value, $after] : vec[$before . $value . $after];
+    return new QueryResult(count($_GLOBALS["query_queue"]) - 1);
 }
 
 function success($print): boolean {
@@ -1102,11 +1145,7 @@ function decrement_ref_count(dict $_GLOBALS, $id) {
 
 function increment_ref_count(dict $_GLOBALS, $id) {
     if ($id === null) return;
-    $query = "UPDATE _list SET ref_count = ref_count + 1 WHERE _id=";
-    // TODO: Function for check if it's a query result and return appropriate vec for queue
-    $_GLOBALS["query_queue"][] = ($id instanceof QueryResult)
-        ? vec[$query, $id]
-        : vec[$query . $id];
+    queue_query($_GLOBALS, "UPDATE _list SET ref_count = ref_count + 1 WHERE _id=", $id, "");
 }
 
 // For debugging
