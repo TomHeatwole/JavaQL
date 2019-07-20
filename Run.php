@@ -140,7 +140,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
     case TokenType::M_GET_VARIABLES:
         if (!must_match($_GLOBALS, $lex, $i, $line, TokenType::L_PAREN)) return false;
         $i++;
-        if (!$param = parse_type($_GLOBALS, $lex, &$i, $line, "", false)) return false;
+        if (!$param = parse_expression($_GLOBALS, $lex, &$i, $line, "", false)) return false;
         if ($param["value"] === null)
             return carrot_and_error("getVariables() expects non-null parameter", $line, $lex[$i - 1]["char_num"]);
         if (is_primitive($_GLOBALS, $param["type"]))
@@ -312,7 +312,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         }
         if (!must_match_unexpected($lex, $i, $line, TokenType::COMMA)) return false;
         $i++;
-        if (!($new_name = parse_type($_GLOBALS, $lex, &$i, $line, "String", false))) return false;
+        if (!($new_name = parse_expression($_GLOBALS, $lex, &$i, $line, "String", false))) return false;
         $new_name = remove_quotes($new_name["value"]);
         if (strlen($new_name) === 0) return error("cannot rename variable to empty string");
         if ($is_class) {
@@ -354,9 +354,9 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         // TODO: Edit file to reflect change?
         return true;
     case TokenType::NEW_LITERAL:
-        // TODO: Could there be a way to bundle things that should begin with parse_type?
-        $i--;
-        if (!$item = parse_type($_GLOBALS, $lex, &$i, $line, "", false)) return false;
+        // TODO: Could there be a way to bundle things that should begin with parse_expression?
+        $i = 0;
+        if (!$item = parse_expression($_GLOBALS, $lex, &$i, $line, "", false)) return false;
         if (!must_end($lex, $i, $line)) return false;
         return display($_GLOBALS, $item["type"], $item["value"]);
     case TokenType::ID:
@@ -396,7 +396,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
                 return success(get_display_value($_GLOBALS, $d["type"], $d["value"]));
             }
             if (!must_match_unexpected($lex, $i++, $line, TokenType::ASSIGN)) return false;
-            if (!($set_value = parse_type($_GLOBALS, $lex, &$i, $line, $d["type"], true))) return false;
+            if (!($set_value = parse_expression($_GLOBALS, $lex, &$i, $line, $d["type"], true))) return false;
             else if (!must_end($lex, $i, $line)) return false;
             $set_value = $set_value["value"];
             $query = "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=";
@@ -432,7 +432,7 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, bool $ref) 
     $var_values = vec[];
     $i++;
     for ($j = 0; $j < count($var_types); $j++) {
-        if (!($var_value = parse_type($_GLOBALS, $lex, &$i, $line, $var_types[$j], true))) {
+        if (!($var_value = parse_expression($_GLOBALS, $lex, &$i, $line, $var_types[$j], true))) {
             echo $class_name, " constructor expects the following parameters: (";
             $var_names = $class_map[$class_name]->toKeysArray();
             for ($j = 0; $j < count($var_names) - 1; $j++) echo $var_types[$j], " ", $var_names[$j], ", ";
@@ -503,7 +503,7 @@ function parse_list_subtype(dict $_GLOBALS, vec $lex, int &$i, string $line) {
 }
 
 function assign(dict $_GLOBALS, vec $lex, int $i, $e, string $line, string $name): boolean {
-    if (!($value = parse_type($_GLOBALS, $lex, &$i, $line, $e, false))) return false;
+    if (!($value = parse_expression($_GLOBALS, $lex, &$i, $line, $e, false))) return false;
     $value = $value["value"];
     if (!must_end($lex, $i, $line)) return false;
     if ($value instanceof QueryResult) {
@@ -516,6 +516,7 @@ function assign(dict $_GLOBALS, vec $lex, int $i, $e, string $line, string $name
 }
 
 function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, string $line) {
+    
     for (;; $i++) {
         if (!$_GLOBALS["ALL_IDS"]->contains($lex[$i]["type"]))
             return unexpected_token($lex[$i], $line);
@@ -546,7 +547,7 @@ function dereference(dict $_GLOBALS, string $type, $value, vec $lex, int &$i, st
 }
 
 // return sym if parsed correctly or false otherwise
-function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref) {
+function parse_expression(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref) {
     $first_token = $lex[$i++];
     if ($_GLOBALS["ALL_LITERALS"]->contains($first_token["type"]))
         return parse_literal($_GLOBALS, $first_token, $line, $e);
@@ -566,7 +567,6 @@ function parse_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $r
 }
 
 function parse_first_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref, $token) {
-    // TODO: move away from $e for uniofrm "can't convert" error messages
     // TODO: Implement default
     switch($token["type"]) {
     case TokenType::NEW_LITERAL:
@@ -591,6 +591,7 @@ function parse_first_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, b
 }
 
 function parse_literal(dict $_GLOBALS, $token, string $line, $e) {
+    // Can we always assume that no expected type is invalid? What if we wanted to support math?
     if ($e === "") return unexpected_token($token, $line);
     switch($token["type"]) {
     case TokenType::INT_LITERAL:
