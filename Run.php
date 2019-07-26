@@ -62,6 +62,7 @@ for (;;) {
     $_GLOBALS["query_queue"] = new Vector();
     $_GLOBALS["assign"] = new Map();
     $_GLOBALS["print_qr"] = new Map();
+    $_GLOBALS["list_bounds_queue"] = new Map();
     $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
     if ($line === "q" || $line === "quit") {
         collect_garbo($_GLOBALS);
@@ -70,6 +71,7 @@ for (;;) {
     if (!$lex = lex_line($_GLOBALS, vec[], $line, 0, true, false)) continue;
     if (!parse_and_execute(&$_GLOBALS, $lex["tokens"], $line)) continue;
     $query_results = new Vector();
+    $list_bounds_queue = $_GLOBALS["list_bounds_queue"];
     $quit = false;
     for ($i = 0; $i < count($_GLOBALS["query_queue"]); $i++) {
         $query_pieces = $_GLOBALS["query_queue"][$i];
@@ -78,11 +80,16 @@ for (;;) {
                 $query_pieces[$j] = $query_results[$query_pieces[$j]->q_num][0];
         if (!$result = mysqli_query($_GLOBALS["conn"], implode($query_pieces))) {
             error($_GLOBALS["MYSQL_ERROR"]);
-            echo implode($query_pieces); // For debugging
+            // echo implode($query_pieces); // For debugging
             $quit = true;
         }
-        if ($quit) break;
         $query_results[] = ($result === true) ? $result : mysqli_fetch_row($result);
+        if ($list_bounds_queue->containsKey($i)) {
+            $check = $list_bounds_queue[$i];
+            if (!list_check_bounds($_GLOBALS, replace_if_qr($_GLOBALS, $check["id"], $query_results),
+                replace_if_qr($_GLOBALS, $check["index"], $query_results))) $quit = true;
+        }
+        if ($quit) break;
     }
     if ($quit) continue;
     $assign = $_GLOBALS["assign"];
@@ -95,7 +102,7 @@ for (;;) {
     $print_qr = $_GLOBALS["print_qr"];
     if (count($print_qr) > 0) {
         switch ($print_qr["print_type"]) {
-            //TODO: enum if there ends up being more of these cases
+            //switch to enum if there ends up being more of these cases
         case "single":
             success(single_query_result_to_string($_GLOBALS,
                 $query_results[$print_qr["qr_num"]], $print_qr["class_name"]));
@@ -196,7 +203,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         if ($confirm !== "y" && $confirm !== "yes") return false;
         $bad_lists = mysqli_query($_GLOBALS["conn"], "SELECT _id from _list WHERE generic=\""
             . $class_name . "\" OR generic REGEXP \"^_L[1-9]\d*" . $class_name . "$\"");
-        if (!$bad_lists) return mysqli_error($_GLOBALS["MYSQL_ERROR"]);
+        if (!$bad_lists) return error($_GLOBALS["MYSQL_ERROR"]);
         while ($list = mysqli_fetch_row($bad_lists))
             if (!delete_list($_GLOBALS, $list[0])) return false;
         remove_all_list_references($_GLOBALS, $class_name);
@@ -256,7 +263,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
                 return found_location($file_path, $lex[$i]["line_num"]);
             }
             $usedNames->add($name);
-            // TODO: Right here is where we'd allow a default option ex. int i = 5;
+            // Right here is where we'd allow a default option ex. int i = 5;
             if (!must_match_f($_GLOBALS, $lex, ++$i, $file_vec, TokenType::SEMI))
                 return found_location($file_path, $lex[$i]["line_num"]);
             $vars[] = shape("type" => $type, "name" => $name);
@@ -395,7 +402,7 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
                 : assign($_GLOBALS, $lex, ++$i, $sym["type"], $line, $lex[0]["value"]);
         }
         if (!must_end($lex, $i, $line)) return false;
-        return success(get_display_value($_GLOBALS, $sym["type"], $sym["value"]));
+        return display($_GLOBALS, $sym["type"], $sym["value"]);
     }
     return unexpected_token($lex[0], $line);
 }
@@ -433,10 +440,9 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, bool $ref) 
         } else $query .= ", " . (($var_values[$j] === null) ? "null" : $var_values[$j]);
     }
     $query_pieces[] = $query . ")";
+    // TODO: could have a queue_query_and_select_last_insert_id which combines the two commands below
     $_GLOBALS["query_queue"][] = $query_pieces;
-    $_GLOBALS["query_queue"][] = vec["SELECT LAST_INSERT_ID()"];
-    $qr = new QueryResult(count($_GLOBALS["query_queue"]) - 1);
-    return shape("value" => $qr, "type" => $class_name);
+    return shape("value" => queue_query($_GLOBALS, vec["SELECT LAST_INSERT_ID()"]), "type" => $class_name);
 }
 
 function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line) {
@@ -453,10 +459,9 @@ function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line) {
     } else $sql_type = $_GLOBALS["PRIM"]->contains($subtype) ? $_GLOBALS["TO_SQL_TYPE_MAP"][$subtype] : "int";
     $insert_values = vec["default", list_subtype_to_sql($subtype), $size, 0];
     $_GLOBALS["query_queue"][] = vec["INSERT INTO _list VALUES (" . implode(", ", $insert_values) . " )"];
-    $_GLOBALS["query_queue"][] = vec["SELECT LAST_INSERT_ID()"];
     $ret = shape(
         "type" => new ListType($subtype, 0),
-        "value" => new QueryResult(count($_GLOBALS["query_queue"]) - 1)
+        "value" => queue_query($_GLOBALS, vec["SELECT LAST_INSERT_ID()"])
     );
     $cols = " (value " . $sql_type;
     $cols .= ($sql_type === "int")
@@ -514,19 +519,19 @@ function db_assign(dict $_GLOBALS, $lex, int $i, $line, $d) {
 }
 
 function dereference(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line) {
-    if ($type instanceof ListType) {
-        $list_method = $lex[$i++];
-        switch ($list_method["value"]) {
-        case "add":
-            if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
-            return list_add($_GLOBALS, $type, $value, $lex, &$i, $line);
-        case "get":
-            if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
-            return list_get($_GLOBALS, $type, $value, $lex, &$i, $line, false);
-        }
-        return unexpected_token($list_method, $line);
-    } 
     for (;; $i++) {
+        if ($type instanceof ListType) {
+            $list_method = $lex[$i++];
+            switch ($list_method["value"]) {
+            case "add":
+                if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
+                return list_add($_GLOBALS, $type, $value, $lex, &$i, $line);
+            case "get":
+                if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
+                return list_get($_GLOBALS, $type, $value, $lex, &$i, $line, false);
+            }
+            return unexpected_token($list_method, $line);
+        }
         if (!$_GLOBALS["ALL_IDS"]->contains($lex[$i]["type"]))
             return unexpected_token($lex[$i], $line);
         if ($value === null) return carrot_and_error("null pointer exception", $line, $lex[$i - 1]["char_num"]);
@@ -539,10 +544,8 @@ function dereference(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $l
         $query = "SELECT " . $row_name . " FROM " . $type . " WHERE _id=";
         $parent = shape("type" => $type, "value" => $value);
         $type = $class_var_type;
-        if ($value instanceof QueryResult) {
-            $_GLOBALS["query_queue"][] = [$query, $value];
-            $value = new QueryResult(count($_GLOBALS["query_queue"]) - 1);
-        } else {
+        if ($value instanceof QueryResult) $value = queue_query($_GLOBALS, vec[$query, $value]);
+        else {
             $result = mysqli_query($_GLOBALS["conn"], $query . $value);
             if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
             $value = mysqli_fetch_row($result)[0];
@@ -558,24 +561,47 @@ function list_get(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line
     if (!($index = parse_expression($_GLOBALS, $lex, &$i, $line, "int", false))) return false;
     $index = $index["value"];
     if (!must_match($_GLOBALS, $lex, $i++, $line, $brackie ? TokenType::R_BRACKIE : TokenType::R_PAREN)) return false;
-    // TODO: Figure out how to check for index out of bounds
+    if (!list_try_bounds_check($_GLOBALS, $value, $index)) return false;
     // TODO: Perhaps [n:m] should be allowed in querying language
     return shape(
-        "value" => queue_query($_GLOBALS, "SELECT * FROM _list_", $value, " LIMIT " . $index . ",1"),
+        "value" => queue_query($_GLOBALS, vec["SELECT * FROM _list_", $value, " LIMIT ", $index, ",1"]),
         "type" => $type->inner()
     );
 }
 
-/* TODO: Finish this
 function list_add(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line) {
     // TODO: Make sure we're sorting out ref_count
-    if (!($add_value = parse_expression($_GLOBALS, $lex, &$i, $type->inner(), $line, true))) return false;
+    if (!($add_value = parse_expression($_GLOBALS, $lex, &$i, $line, $type->inner(), true))) return false;
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
     $add_value = $add_value["value"];
-    queue_query($_GLOBALS, "INSERT INTO _list_", $value, " values(" . $add_value . ")");
+    queue_query($_GLOBALS, vec["INSERT INTO _list_", $value, " values(", $add_value, ")"]);
+    return shape("value" => "", "type" => "no print");
+}
+
+function list_try_bounds_check(dict $_GLOBALS, $list_id, $index) {
+    $q_num = max_q_num($list_id, $index);
+    if ($q_num === -1) {
+        return list_check_bounds($_GLOBALS, $list_id, $index);
+    }
+    $_GLOBALS["list_bounds_queue"][$q_num] = shape("id" => $list_id, "index" => $index);
     return true;
 }
- */
+
+// Return the highest q_num of two values or -1 if neither value is a QueryResult
+function max_q_num($value1, $value2) {
+    if ($value1 instanceof QueryResult && $value2 instanceof QueryResult) return max($value1->q_num, $value2->q_num);
+    if ($value1 instanceof QueryResult) return $value1->q_num;
+    return ($value2 instanceof QueryResult) ? $value2->q_num : -1;
+}
+
+function list_check_bounds(dict $_GLOBALS, $list_id, $index) {
+    if (!($size = mysqli_query($_GLOBALS["conn"], "SELECT count(*) FROM _list_" . $list_id)))
+        return error($_GLOBALS["MYSQL_ERROR"]);
+    $size = mysqli_fetch_row($size)[0];
+    if ($index >= $size || $index < 0) return error("index " . $index . " out of bounds for length " . $size);
+    return true;
+}
+
 
 // return sym if parsed correctly or false otherwise
 function parse_expression(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref) {
@@ -724,8 +750,11 @@ function get_display_value_for_db_result(dict $_GLOBALS, $type, $value) {
 }
 
 function get_display_value(dict $_GLOBALS, $type, $value) {
-    if ($type === "boolean") return $value && $value !== "false" ? "true" : "false";
-    if ($type === "double" || $type === "float") {
+    switch($type) {
+    case "no print": return "";
+    case "boolean": return $value && $value !== "false" ? "true" : "false";
+    case "double":
+    case "float":
         $value = str_replace("e", "E", $value);
         $value = str_replace("+", "", $value);
         return strpos($value, ".") ? $value : $value .= ".0";
@@ -791,6 +820,7 @@ function unexpected_token($token, string $line): boolean {
 }
 
 function bad_conversion($expected, $found) {
+    if ($found === "no print") $found = "List method call";
     return error("cannot convert " . $found . " to " . $expected);
 }
 
@@ -877,14 +907,13 @@ function java_ref_to_mysql($type, string $name): string {
         : "_" . strlen($type) . $type . $name;
 }
 
-function queue_query(dict $_GLOBALS, string $before, $value, string $after) {
-    $_GLOBALS["query_queue"][] =
-        ($value instanceof QueryResult) ? vec[$before, $value, $after] : vec[$before . $value . $after];
+function queue_query(dict $_GLOBALS, vec $q) {
+    $_GLOBALS["query_queue"][] = $q;
     return new QueryResult(count($_GLOBALS["query_queue"]) - 1);
 }
 
 function success($print): boolean {
-    echo $print, "\n";
+    if ($print !== "") echo $print, "\n";
     return true;
 }
 
@@ -1126,13 +1155,35 @@ function int_trim_zeros(string $value): string {
     return $prefix . substr($value, $i);
 }
 
+// TODO: Fix garbage collector
 function collect_garbo(dict $_GLOBALS) {
-    $result = mysqli_query($_GLOBALS["conn"], "SELECT _id, ref_count FROM _list");
-    if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
-    while ($row = mysqli_fetch_assoc($result)) {
-        if ($row["ref_count"] === 0) delete_list($_GLOBALS, $row["_id"]);
+    for (;;) {
+        $start_over = false;
+        $result = mysqli_query($_GLOBALS["conn"], "SELECT _id, ref_count, generic FROM _list");
+        if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
+        while ($row = mysqli_fetch_assoc($result)) {
+            if ($row["ref_count"] === 0) {
+                if ($row["generic"][0] === "_") { // Case where we're deleting a list that contains refs to sublists
+                    decrement_sublists($_GLOBALS, $row["_id"]);
+                    $start_over = true;
+                    break;
+                }
+                delete_list($_GLOBALS, $row["_id"]);
+            }
+        }
+        //if ($start_over) continue;
+        break;
     }
     return true;
+}
+
+function decrement_sublists($_GLOBALS, $id) {
+    if (!(mysqli_query($_GLOBALS["conn"], "UPDATE _list l INNER JOIN (SELECT l._id, count(l._id) num_refs FROM _list_"
+        . $id . " INNER JOIN _list l ON value=l._id GROUP BY l._id) c ON l._id=c._id"
+        . " SET ref_count = ref_count - num_refs"))) {
+        error($_GLOBALS["MYSQL_ERROR"]);
+    }
+    
 }
 
 function delete_list(dict $_GLOBALS, int $id) {
@@ -1150,7 +1201,7 @@ function decrement_ref_count(dict $_GLOBALS, $id) {
 
 function increment_ref_count(dict $_GLOBALS, $id) {
     if ($id === null) return;
-    queue_query($_GLOBALS, "UPDATE _list SET ref_count = ref_count + 1 WHERE _id=", $id, "");
+    queue_query($_GLOBALS, vec["UPDATE _list SET ref_count = ref_count + 1 WHERE _id=", $id, ""]);
 }
 
 // For debugging
@@ -1172,6 +1223,13 @@ function remove_all_list_references(dict $_GLOBALS, string $class_name) {
                . $class_name . " INNER JOIN _list l ON " . $col["name"] . "=l._id GROUP BY l._id) c ON l._id=c._id "
                . "SET ref_count = ref_count - num_refs");
         }
-    } 
+    }
+}
+
+
+// The following methods are meant to work only after the command has been parsed and the query queue is in progress
+
+function replace_if_qr(dict $_GLOBALS, $value, Vector $query_results) {
+    return ($value instanceof QueryResult) ? $query_results[$value->q_num][0] : $value;
 }
 
