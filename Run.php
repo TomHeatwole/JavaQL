@@ -387,32 +387,13 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         return assign($_GLOBALS, $lex, ++$i, $e, $line, $name);
     }
     if ($_GLOBALS["VAR_IDS"]->contains($lex[0]["type"])) {
-        $sym = $_GLOBALS["symbol_table"][$lex[0]["value"]];
-        if ($lex[0]["type"] === TokenType::OBJ_ID && $lex[$i]["type"] === TokenType::DOT) {
-            $i++;
-            if (!($d = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line))) return false;
-            if ($end = check_end($lex, $i, $line)) {
-                if ($end === -1) return false;
-                return success(get_display_value($_GLOBALS, $d["type"], $d["value"]));
-            }
-            if (!must_match_unexpected($lex, $i++, $line, TokenType::ASSIGN)) return false;
-            if (!($set_value = parse_expression($_GLOBALS, $lex, &$i, $line, $d["type"], true))) return false;
-            else if (!must_end($lex, $i, $line)) return false;
-            $set_value = $set_value["value"];
-            $query = "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=";
-            if ($set_value === null) $set_value = "null";
-            if ($set_value instanceof QueryResult) {
-                $query_pieces = vec[$query];
-                $query_pieces[] = $set_value;
-                $query_pieces[] = " WHERE _id=" . $d["parent"]["value"];
-                $_GLOBALS["query_queue"][] = $query_pieces;
-            } else if (!mysqli_query($_GLOBALS["conn"], $query . $set_value .
-                " WHERE _id=" . $d["parent"]["value"])) return error($_GLOBALS["MYSQL_ERROR"]);
-            if ($d["type"] instanceof ListType) decrement_ref_count($_GLOBALS, $d["value"]);
-            return true;
+        $i = 0;
+        if (!$sym = parse_expression($_GLOBALS, $lex, &$i, $line, "", false)) return false;
+        if ($lex[$i]["type"] === TokenType::ASSIGN) {
+            return $sym["parent"] !== null
+                ? db_assign($_GLOBALS, $lex, ++$i, $line, $sym)
+                : assign($_GLOBALS, $lex, ++$i, $sym["type"], $line, $lex[0]["value"]);
         }
-        if ($lex[$i]["type"] === TokenType::ASSIGN)
-            return assign($_GLOBALS, $lex, ++$i, $sym["type"], $line, $lex[0]["value"]);
         if (!must_end($lex, $i, $line)) return false;
         return success(get_display_value($_GLOBALS, $sym["type"], $sym["value"]));
     }
@@ -515,14 +496,30 @@ function assign(dict $_GLOBALS, vec $lex, int $i, $e, string $line, string $name
     return true;
 }
 
+function db_assign(dict $_GLOBALS, $lex, int $i, $line, $d) {
+    if (!($set_value = parse_expression($_GLOBALS, $lex, &$i, $line, $d["type"], true))) return false;
+    else if (!must_end($lex, $i, $line)) return false;
+    $set_value = $set_value["value"];
+    $query = "UPDATE " . $d["parent"]["type"] . " SET " . $d["row_name"] . "=";
+    if ($set_value === null) $set_value = "null";
+    if ($set_value instanceof QueryResult) {
+        $query_pieces = vec[$query];
+        $query_pieces[] = $set_value;
+        $query_pieces[] = " WHERE _id=" . $d["parent"]["value"];
+        $_GLOBALS["query_queue"][] = $query_pieces;
+    } else if (!mysqli_query($_GLOBALS["conn"], $query . $set_value .
+        " WHERE _id=" . $d["parent"]["value"])) return error($_GLOBALS["MYSQL_ERROR"]);
+    if ($d["type"] instanceof ListType) decrement_ref_count($_GLOBALS, $d["value"]);
+    return true;
+}
+
 function dereference(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line) {
     if ($type instanceof ListType) {
         $list_method = $lex[$i++];
         switch ($list_method["value"]) {
-            /* TODO
         case "add":
             if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
-             */
+            return list_add($_GLOBALS, $type, $value, $lex, &$i, $line);
         case "get":
             if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
             return list_get($_GLOBALS, $type, $value, $lex, &$i, $line, false);
@@ -563,16 +560,20 @@ function list_get(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line
     if (!must_match($_GLOBALS, $lex, $i++, $line, $brackie ? TokenType::R_BRACKIE : TokenType::R_PAREN)) return false;
     // TODO: Figure out how to check for index out of bounds
     // TODO: Perhaps [n:m] should be allowed in querying language
-    
     return shape(
         "value" => queue_query($_GLOBALS, "SELECT * FROM _list_", $value, " LIMIT " . $index . ",1"),
         "type" => $type->inner()
     );
 }
 
-/*
+/* TODO: Finish this
 function list_add(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line) {
-
+    // TODO: Make sure we're sorting out ref_count
+    if (!($add_value = parse_expression($_GLOBALS, $lex, &$i, $type->inner(), $line, true))) return false;
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
+    $add_value = $add_value["value"];
+    queue_query($_GLOBALS, "INSERT INTO _list_", $value, " values(" . $add_value . ")");
+    return true;
 }
  */
 
@@ -595,7 +596,7 @@ function parse_expression(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, b
         }
         break;
     }
-    if ($sym["type"] != $e && $e !== "") return error("cannot convert " . $sym["type"] . " to " . $e);
+    if ($sym["type"] != $e && $e !== "") return bad_conversion($e, $sym["type"]);
     if ($sym["type"] instanceof ListType && $ref) increment_ref_count($_GLOBALS, $sym["value"]);
     return $sym;
 }
@@ -692,7 +693,7 @@ function parse_id($_GLOBALS, $token, $line, $e, Set $accept) {
         "value" => $_GLOBALS["symbol_table"][$token["value"]]["value"],
         "type" => $e,
     );
-    return expected_but_found($_GLOBALS, $token, $line, $e);
+    return bad_conversion($e, $_GLOBALS["symbol_table"][$token["value"]]["type"]);
 }
 
 function query_result_to_string(dict $_GLOBALS, $result, string $class_name): string {
@@ -787,6 +788,10 @@ function must_match_unexpected(vec $lex, int $i, string $line, TokenType $e) {
 
 function unexpected_token($token, string $line): boolean {
     return carrot_and_error("unexpected token: " . $token["value"], $line, $token["char_num"]);
+}
+
+function bad_conversion($expected, $found) {
+    return error("cannot convert " . $found . " to " . $expected);
 }
 
 function expected_but_found_literal($token, string $line, string $e): boolean {

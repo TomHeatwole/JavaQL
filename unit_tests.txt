@@ -479,13 +479,9 @@ new Prims("", longID
 new Prims("", floatID
 new Post("New York Post", postID);
 OUTPUT
-new Prims("", longID
-              ^
-Error: expected byte but found long variable
+Error: cannot convert long to byte
 Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
-new Prims("", floatID
-              ^
-Error: expected byte but found float variable
+Error: cannot convert float to byte
 Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
 Error: cannot convert Post to User
 Post constructor expects the following parameters: (String content, User owner)
