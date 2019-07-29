@@ -403,9 +403,7 @@ new object fails on bad parameters
 INPUT
 Post badParam = new Post(334, null);
 OUTPUT
-Post badParam = new Post(334, null);
-                         ^
-Error: expected String but found int
+Error: cannot convert int to String
 Post constructor expects the following parameters: (String content, User owner)
 
 NAME
@@ -511,9 +509,7 @@ long tooLarge5 = 9223372036854775808;
 long notTooLarge = -9223372036854775808;
 double tooNull = null;
 OUTPUT
-new Prims('a'
-          ^
-Error: expected String but found char
+Error: cannot convert char to String
 Prims constructor expects the following parameters: (String s, byte b, short sh, int i, long l, float f, double d, char c, boolean boo)
 new Prims("", 0, 0, 0, 0, 999999999999999999999999999999999999999999999999, 0, 'a', false);
                           ^
@@ -546,9 +542,7 @@ Error: int literal is too large for type double
 long tooLarge5 = 9223372036854775808;
                  ^
 Error: integer value 9223372036854775808 is too large for type long
-double tooNull = null;
-                 ^
-Error: expected double but found "null"
+Error: cannot convert "null" to double
 
 NAME
 get display value
@@ -832,9 +826,7 @@ goodList13.add(new Prims("", 0,     0, 0, 0, 0, 0, '\"', false).i);
 new Favorites(null, new List<String>(), null, null, null).comments.get(0);
 new Favorites(null, new List<String>(), null, null, null).comments.get(new Prims("", 0, 0, 0, 0, 0, 0, '\"', false).i);
 OUTPUT
-goodList13.add("haha");
-               ^
-Error: expected int but found String
+Error: cannot convert String to int
 Error: index 0 out of bounds for length 0
 Error: index -6 out of bounds for length 0
 Error: index 0 out of bounds for length 0

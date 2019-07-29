@@ -681,7 +681,7 @@ function parse_literal(dict $_GLOBALS, $token, string $line, $e) {
                 " is too large for type " . $e, $line, $token["char_num"]) 
                 : shape("value" => intval($token["value"]), "type" => $e);
         }
-        return expected_but_found($_GLOBALS, $token, $line, $e);
+        break;
     case TokenType::FLOAT_LITERAL:
         $double_value = doubleval($token["value"]);
         if ($double_value === INF || $double_value === -INF)
@@ -692,23 +692,21 @@ function parse_literal(dict $_GLOBALS, $token, string $line, $e) {
             return shape("value" => floatval($token["value"]), "type" => $e);
         }
         if ($e === "double") return shape("value" => $double_value, "type" => $e);
-        return expected_but_found($_GLOBALS, $token, $line, $e);
+        break;
     case TokenType::CHAR_LITERAL:
         if ($e === "char") return shape("value" => $token["value"], "type" => $e);
-        return expected_but_found($_GLOBALS, $token, $line, $e);
-        if (!$sym) return false;
+        break;
     case TokenType::STRING_LITERAL:
         if ($e === "String") return shape("value" => $token["value"], "type" => $e);
-        return expected_but_found($_GLOBALS, $token, $line, $e);
+        break;
     case TokenType::BOOLEAN_LITERAL:
         if ($e === "boolean") return shape("value" => $token["value"], "type" => $e);
-        return expected_but_found($_GLOBALS, $token, $line, $e);
+        break;
     case TokenType::NULL_LITERAL:
-        return (is_primitive($_GLOBALS, $e))
-            ? expected_but_found($_GLOBALS, $token, $line, $e)
-            : shape("value" => null, "type" => $e);
+        if (!is_primitive($_GLOBALS, $e)) return shape("value" => null, "type" => $e);
+        break;
     }
-    return false; // This sound theoretically be unreachable
+    return bad_conversion($e, $_GLOBALS["TOKEN_NAME_MAP"][$token["type"]]);
 }
 
 function parse_id($_GLOBALS, $token, $line, $e, Set $accept) {
