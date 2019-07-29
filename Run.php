@@ -1155,23 +1155,19 @@ function int_trim_zeros(string $value): string {
     return $prefix . substr($value, $i);
 }
 
-// TODO: Fix garbage collector
 function collect_garbo(dict $_GLOBALS) {
     for (;;) {
         $start_over = false;
-        $result = mysqli_query($_GLOBALS["conn"], "SELECT _id, ref_count, generic FROM _list");
+        $result = mysqli_query($_GLOBALS["conn"], "SELECT _id, generic FROM _list WHERE ref_count=0");
         if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
         while ($row = mysqli_fetch_assoc($result)) {
-            if ($row["ref_count"] === 0) {
-                if ($row["generic"][0] === "_") { // Case where we're deleting a list that contains refs to sublists
-                    decrement_sublists($_GLOBALS, $row["_id"]);
-                    $start_over = true;
-                    break;
-                }
-                delete_list($_GLOBALS, $row["_id"]);
+            if ($row["generic"][0] === "_") { // Case where we're deleting a list that contains refs to sublists
+                decrement_sublists($_GLOBALS, $row["_id"]);
+                $start_over = true;
             }
+            delete_list($_GLOBALS, $row["_id"]);
         }
-        //if ($start_over) continue;
+        if ($start_over) continue;
         break;
     }
     return true;
@@ -1187,9 +1183,7 @@ function decrement_sublists($_GLOBALS, $id) {
 }
 
 function delete_list(dict $_GLOBALS, int $id) {
-    if (!mysqli_query($_GLOBALS["conn"], "DELETE FROM _list WHERE _id=" . $id)) {
-        return error($_GLOBALS["MYSQL_ERROR"]);
-    }
+    if (!mysqli_query($_GLOBALS["conn"], "DELETE FROM _list WHERE _id=" . $id)) return error($_GLOBALS["MYSQL_ERROR"]);
     if (!mysqli_query($_GLOBALS["conn"], "DROP TABLE _list_" . $id)) return error($_GLOBALS["MYSQL_ERROR"]);
     return true;
 }
