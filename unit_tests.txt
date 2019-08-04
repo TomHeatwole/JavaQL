@@ -827,10 +827,12 @@ goodList13.get(-6);
 goodList13.add(new Prims("", 0,     0, 0, 0, 0, 0, '\"', false).i);
 new Favorites(null, new List<String>(), null, null, null).comments.get(0);
 new Favorites(null, new List<String>(), null, null, null).comments.get(new Prims("", 0, 0, 0, 0, 0, 0, '\"', false).i);
+new List<int>().get(0);
 OUTPUT
 Error: cannot convert String to int
 Error: index 0 out of bounds for length 0
 Error: index -6 out of bounds for length 0
+Error: index 0 out of bounds for length 0
 Error: index 0 out of bounds for length 0
 Error: index 0 out of bounds for length 0
 

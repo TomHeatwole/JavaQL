@@ -88,7 +88,9 @@ for (;;) {
         if ($list_bounds_queue->containsKey($i)) {
             $check = $list_bounds_queue[$i];
             if (!list_check_bounds($_GLOBALS, replace_if_qr($_GLOBALS, $check["id"], $query_results),
-                replace_if_qr($_GLOBALS, $check["index"], $query_results))) $quit = true;
+                replace_if_qr($_GLOBALS, $check["index"], $query_results))) {
+                $quit = true;
+            }
         }
     }
     if ($quit) continue;
@@ -461,13 +463,14 @@ function parse_new_list(dict $_GLOBALS, vec $lex, int &$i, string $line) {
         $subtype_table = "_list";
         $sql_type = "int";
     } else $sql_type = $_GLOBALS["PRIM"]->contains($subtype) ? $_GLOBALS["TO_SQL_TYPE_MAP"][$subtype] : "int";
+    $cols = " (value " . $sql_type;
     $insert_values = vec["default", list_subtype_to_sql($subtype), $size, 0];
     $_GLOBALS["query_queue"][] = vec["INSERT INTO _list VALUES (" . implode(", ", $insert_values) . " )"];
     $ret = shape(
         "type" => new ListType($subtype, 0),
         "value" => queue_query($_GLOBALS, vec["SELECT LAST_INSERT_ID()"])
     );
-    $cols = " (value " . $sql_type;
+
     $cols .= ($sql_type === "int")
         ? ", FOREIGN KEY (value) REFERENCES " . $subtype_table . "(_id) ON DELETE SET NULL)"
         : ")";
@@ -607,24 +610,17 @@ function list_set(dict $_GLOBALS, $list_id, $index, $new_value) {
 }
 
 function list_try_bounds_check(dict $_GLOBALS, $list_id, $index) {
-    $q_num = max_q_num($list_id, $index);
-    if ($q_num === -1) {
-        return list_check_bounds($_GLOBALS, $list_id, $index);
+    if ($list_id instanceof QueryResult || $index instanceof QueryResult) {
+        $_GLOBALS["list_bounds_queue"][count($_GLOBALS["query_queue"]) - 1] = shape("id" => $list_id, "index" => $index);
+        return true;
     }
-    $_GLOBALS["list_bounds_queue"][$q_num] = shape("id" => $list_id, "index" => $index);
-    return true;
-}
-
-// Return the highest q_num of two values or -1 if neither value is a QueryResult
-function max_q_num($value1, $value2) {
-    if ($value1 instanceof QueryResult && $value2 instanceof QueryResult) return max($value1->q_num, $value2->q_num);
-    if ($value1 instanceof QueryResult) return $value1->q_num;
-    return ($value2 instanceof QueryResult) ? $value2->q_num : -1;
+    return list_check_bounds($_GLOBALS, $list_id, $index);
 }
 
 function list_check_bounds(dict $_GLOBALS, $list_id, $index) {
-    if (!($size = mysqli_query($_GLOBALS["conn"], "SELECT count(*) FROM _list_" . $list_id)))
+    if (!($size = mysqli_query($_GLOBALS["conn"], "SELECT count(*) FROM _list_" . $list_id))) {
         return error($_GLOBALS["MYSQL_ERROR"]);
+    }
     $size = mysqli_fetch_row($size)[0];
     if ($index >= $size || $index < 0) return error("index " . $index . " out of bounds for length " . $size);
     return true;
