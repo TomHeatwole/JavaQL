@@ -526,10 +526,13 @@ function dereference(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $l
             switch ($list_method["value"]) {
             case "add":
                 if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
-                return list_add($_GLOBALS, $type, $value, $lex, &$i, $line, true);
+                return parse_list_add($_GLOBALS, $type, $value, $lex, &$i, $line, true);
             case "get":
                 if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
-                return list_get($_GLOBALS, $type, $value, $lex, &$i, $line, false);
+                return parse_list_get_paren($_GLOBALS, $type, $value, $lex, &$i, $line, false);
+            case "set":
+                if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
+                return parse_list_set_paren($_GLOBALS, $type, $value, $lex, &$i, $line);
             }
             return unexpected_token($list_method, $line);
         }
@@ -558,23 +561,43 @@ function dereference(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $l
     return shape("parent" => $parent, "value" => $value, "type" => $type, "row_name" => $row_name);
 }
 
-function list_get(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line, boolean $brackie) {
+// Parse a list get with the .get(int) syntax
+function parse_list_get_paren(dict $_GLOBALS, $type, $list_id, vec $lex, int &$i, string $line) {
     if (!($index = parse_expression($_GLOBALS, $lex, &$i, $line, "int", false))) return false;
     $index = $index["value"];
-    if (!must_match($_GLOBALS, $lex, $i++, $line, $brackie ? TokenType::R_BRACKIE : TokenType::R_PAREN)) return false;
-    if (!list_try_bounds_check($_GLOBALS, $value, $index)) return false;
-    // TODO: Perhaps [n:m] should be allowed in querying language
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
+    return list_get($_GLOBALS, $index, $list_id, $type);
+}
+
+function list_get(dict $_GLOBALS, $index, $list_id, ListType $type) {
+    if (!list_try_bounds_check($_GLOBALS, $list_id, $index)) return false;
     return shape(
-        "value" => queue_query($_GLOBALS, vec["SELECT * FROM _list_", $value, " LIMIT ", $index, ",1"]),
+        "value" => queue_query($_GLOBALS, vec["SELECT * FROM _list_", $list_id, " LIMIT ", $index, ",1"]),
         "type" => $type->inner()
     );
 }
 
-function list_add(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line, bool $r_paren_needed) {
+function parse_list_add(dict $_GLOBALS, ListType $type, $list_id, vec $lex, int &$i, string $line, bool $r_paren) {
     if (!($add_value = parse_expression($_GLOBALS, $lex, &$i, $line, $type->inner(), true))) return false;
-    if ($r_paren_needed && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
+    if ($r_paren && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
     $add_value = $add_value["value"];
-    queue_query($_GLOBALS, vec["INSERT INTO _list_", $value, " values(", $add_value, ")"]);
+    queue_query($_GLOBALS, vec["INSERT INTO _list_", $list_id, " values(", $add_value, ")"]);
+    return shape("value" => "", "type" => "no print");
+}
+
+function parse_list_set_paren(dict $_GLOBALS, $type, $list_id, vec $lex, int &$i, string $line) {
+    if (!($index = parse_expression($_GLOBALS, $lex, &$i, $line, "int", false))) return false;
+    $index = $index["value"];
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::COMMA)) return false;
+    if (!($new_value = parse_expression($_GLOBALS, $lex, &$i, $line, $type->inner(), false))) return false;
+    $new_value = $new_value["value"];
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
+    return list_set($_GLOBALS, $list_id, $index, $new_value);
+}
+
+function list_set(dict $_GLOBALS, $list_id, $index, $new_value) {
+    if (!list_try_bounds_check($_GLOBALS, $list_id, $index)) return false;
+    // TODO: queue_query command that updates only the nth results :/
     return shape("value" => "", "type" => "no print");
 }
 
@@ -631,13 +654,20 @@ function parse_expression(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, b
 
 // Called when list is followed by left bracket (ex. new List<int>()[ ... )
 function parse_list_brackie(dict $_GLOBALS, vec $lex, int &$i, string $line, $sym) {
-    if (!($lex[$i]["type"] === TokenType::R_BRACKIE)) {
-        // TODO: set case list[5] = ...
-        return list_get($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line, true);
+    if ($lex[$i]["type"] === TokenType::R_BRACKIE) {
+        $i++;
+        if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::ASSIGN)) return false;
+        return parse_list_add($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line, false);
     }
+    if (!($index = parse_expression($_GLOBALS, $lex, &$i, $line, "int", false))) return false;
+    $index = $index["value"];
+    // TODO: Here's where we could allow List[n:m]
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_BRACKIE)) return false;
+    if ($lex[$i]["type"] !== TokenType::ASSIGN) return list_get($_GLOBALS, $index, $sym["value"], $sym["type"]);
     $i++;
-    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::ASSIGN)) return false;
-    return list_add($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line, false);
+    if (!($new_value = parse_expression($_GLOBALS, $lex, &$i, $line, $sym["type"]->inner(), true))) return false;
+    $new_value = $new_value["value"];
+    return list_set($_GLOBALS, $sym["value"], $index, $new_value);
 }
 
 function parse_first_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref, $token) {
