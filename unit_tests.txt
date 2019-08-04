@@ -713,6 +713,7 @@ goodList3;
 goodList4;
 List<List<char>> goodList5 = goodList4;
 goodList5;
+new List<int>();
 OUTPUT
 null
 List<int>@#
@@ -720,6 +721,7 @@ List<Post>@#
 List<List<List<Post>>>@#
 List<List<char>>@#
 List<List<char>>@#
+List<int>@#
 
 NAME
 clear local variables

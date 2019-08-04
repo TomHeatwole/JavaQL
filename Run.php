@@ -69,7 +69,7 @@ for (;;) {
         break;
     }
     if (!$lex = lex_line($_GLOBALS, vec[], $line, 0, true, false)) continue;
-    if (!parse_and_execute(&$_GLOBALS, $lex["tokens"], $line)) continue;
+    if (!parse_statement(&$_GLOBALS, $lex["tokens"], $line)) continue;
     $query_results = new Vector();
     $list_bounds_queue = $_GLOBALS["list_bounds_queue"];
     $quit = false;
@@ -108,15 +108,16 @@ for (;;) {
                 $query_results[$print_qr["qr_num"]], $print_qr["class_name"]));
             break;
         case "display":
-            success(get_display_value_for_db_result($_GLOBALS,
-                $print_qr["class_name"], $query_results[$print_qr["qr_num"]][0]));
+            $qr = $query_results[$print_qr["qr_num"]];
+            $qr = $qr[0];
+            success(get_display_value_for_db_result($_GLOBALS, $print_qr["type"], $qr));
             break;
         }
     }
 }
 
 // Parse statement (given as vector of tokens)
-function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
+function parse_statement(dict &$_GLOBALS, vec $lex, string $line) {
     if (count($lex) == 0) return false;
     $class_map = $_GLOBALS["class_map"];
     $i = 1;
@@ -362,7 +363,6 @@ function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
         // TODO: Edit file to reflect change?
         return true;
     case TokenType::NEW_LITERAL:
-        // TODO: Could there be a way to bundle things that should begin with parse_expression?
         $i = 0;
         if (!$item = parse_expression($_GLOBALS, $lex, &$i, $line, "", false)) return false;
         if (!must_end($lex, $i, $line)) return false;
@@ -413,7 +413,7 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, bool $ref) 
     $class_map = $_GLOBALS["class_map"];
     if ($lex[$i]["type"] === TokenType::J_LIST) {
         $i++;
-        return new_list($_GLOBALS, $lex, &$i, $line);
+        return parse_new_list($_GLOBALS, $lex, &$i, $line);
     }
     if (!($class_name = must_match($_GLOBALS, $lex, $i, $line, TokenType::CLASS_ID))) return false;
     if (!must_match($_GLOBALS, $lex, ++$i, $line, TokenType::L_PAREN)) return false;
@@ -446,13 +446,16 @@ function new_object(dict $_GLOBALS, vec $lex, int &$i, string $line, bool $ref) 
     return shape("value" => queue_query($_GLOBALS, vec["SELECT LAST_INSERT_ID()"]), "type" => $class_name);
 }
 
-function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line) {
+function parse_new_list(dict $_GLOBALS, vec $lex, int &$i, string $line) {
     if (!($subtype = parse_list_subtype($_GLOBALS, $lex, &$i, $line))) return false;
-    // TODO: copy constructor
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
+    if ($lex[$i]["type"] !== TokenType::R_PAREN) {
+        if (!($copy_list = parse_expression($_GLOBALS, $lex, &$i, $line, new ListType($subtype, 0), false))) {
+            return false;
+        }
+        if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
+    } else $i++;
     $size = 0;
-    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
-    // TODO: consider adding what list constructor expects ??
     $subtype_table = $subtype;
     if ($subtype instanceof ListType) {
         $subtype_table = "_list";
@@ -469,6 +472,8 @@ function new_list(dict $_GLOBALS, vec $lex, int &$i, string $line) {
         ? ", FOREIGN KEY (value) REFERENCES " . $subtype_table . "(_id) ON DELETE SET NULL)"
         : ")";
     $_GLOBALS["query_queue"][] = vec["CREATE TABLE _list_", $ret["value"], $cols];
+    // if ($copy_list) queue_query($_GLOBALS, vec[""]); TODO: Figure out how to copy these in in one query
+    // TODO: It's also possible that duplicating the entire table can be done in a query in which case we modify the code above
     return $ret;
 }
 
@@ -713,7 +718,7 @@ function parse_literal(dict $_GLOBALS, $token, string $line, $e) {
                 return shape("value" => doubleval($token["value"]), "type" => $e);
             return carrot_and_error("int literal is too large for type double", $line, $token["char_num"]);
         }
-        if ($_GLOBALS["INT_MAX"]->containsKey($e)) {
+        if (!($e instanceof ListType) && $_GLOBALS["INT_MAX"]->containsKey($e)) {
             $max = $_GLOBALS["INT_MAX"][$e];
             $too_long = false;
             if ($e === "long") {
@@ -808,8 +813,8 @@ function get_display_value(dict $_GLOBALS, $type, $value) {
 function display($_GLOBALS, $type, $value) {
     if ($value instanceof QueryResult) {
         $_GLOBALS["print_qr"]["print_type"] = "display";
-        $_GLOBALS["print_qr"]["class_name"] = $type;
-        $_GLOBALS["print_qr"]["qr_num"] = count($_GLOBALS["query_queue"]) - 1;
+        $_GLOBALS["print_qr"]["type"] = $type;
+        $_GLOBALS["print_qr"]["qr_num"] = $value->q_num;
         return true;
     } else return success(get_display_value($_GLOBALS, $type, $value));
 }
