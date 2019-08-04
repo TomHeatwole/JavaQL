@@ -797,17 +797,17 @@ NAME
 list add/get success
 INPUT
 List<int> goodList10 = new List<int>();
-new List<String>().add("this shouldn't produce an error");
+new List<String>()[] = "this shouldn't produce an error";
 new Favorites(null, new List<String>(), null, null, null).comments.add("This somehow should work too");
 goodList10.add(35);
-goodList10.add(22);
+goodList10[] = 22;
 goodList10.add(-446);
 goodList10[2];
 goodList10.get(0);
 List<List<List<User>>> goodList12 = new List<List<List<User>>>();
 goodList12.add(new List<List<User>>());
 goodList12.get(0).add(new List<User>());
-goodList12[0][0].add(new User("Nesty", -1285191528076130, null, null));
+goodList12[0][0][] = new User("Nesty", -1285191528076130, null, null);
 goodList12.get(0)[0].add(goodList12[0][0][0]);
 goodList12[0].get(0).get(1).username;
 OUTPUT
@@ -836,7 +836,7 @@ NAME
 list add/get success with queued bounds check
 INPUT
 List<String> goodList14 = new List<String>();
-goodList14.add("check this out");
+goodList14[] = "check this out";
 new Favorites(null, goodList14, null, null, null).comments.get(new Prims("", 0, 0, 0, 0, 0, 0, '\"', false).i);
 new Favorites(null, goodList14, null, null, null).comments[0];
 OUTPUT

@@ -82,6 +82,7 @@ for (;;) {
             error($_GLOBALS["MYSQL_ERROR"]);
             // echo implode($query_pieces); // For debugging
             $quit = true;
+            break;
         }
         $query_results[] = ($result === true) ? $result : mysqli_fetch_row($result);
         if ($list_bounds_queue->containsKey($i)) {
@@ -89,7 +90,6 @@ for (;;) {
             if (!list_check_bounds($_GLOBALS, replace_if_qr($_GLOBALS, $check["id"], $query_results),
                 replace_if_qr($_GLOBALS, $check["index"], $query_results))) $quit = true;
         }
-        if ($quit) break;
     }
     if ($quit) continue;
     $assign = $_GLOBALS["assign"];
@@ -115,6 +115,7 @@ for (;;) {
     }
 }
 
+// Parse statement (given as vector of tokens)
 function parse_and_execute(dict &$_GLOBALS, vec $lex, string $line) {
     if (count($lex) == 0) return false;
     $class_map = $_GLOBALS["class_map"];
@@ -525,7 +526,7 @@ function dereference(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $l
             switch ($list_method["value"]) {
             case "add":
                 if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
-                return list_add($_GLOBALS, $type, $value, $lex, &$i, $line);
+                return list_add($_GLOBALS, $type, $value, $lex, &$i, $line, true);
             case "get":
                 if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::L_PAREN)) return false;
                 return list_get($_GLOBALS, $type, $value, $lex, &$i, $line, false);
@@ -569,10 +570,9 @@ function list_get(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line
     );
 }
 
-function list_add(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line) {
-    // TODO: Make sure we're sorting out ref_count
+function list_add(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $line, bool $r_paren_needed) {
     if (!($add_value = parse_expression($_GLOBALS, $lex, &$i, $line, $type->inner(), true))) return false;
-    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
+    if ($r_paren_needed && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
     $add_value = $add_value["value"];
     queue_query($_GLOBALS, vec["INSERT INTO _list_", $value, " values(", $add_value, ")"]);
     return shape("value" => "", "type" => "no print");
@@ -608,23 +608,36 @@ function parse_expression(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, b
     $first_token = $lex[$i++];
     if (!($sym = parse_first_type($_GLOBALS, $lex, &$i, $line, $e, $ref, $first_token))) return false;
     if (is_primitive($_GLOBALS, $sym["type"])) return $sym;
-    for (;;) {
-        $follow_type = $lex[$i]["type"];
-        if ($follow_type === TokenType::DOT || $follow_type === TokenType::L_BRACKIE) {
+    while (!$done) {
+        switch($lex[$i]["type"]) {
+        case TokenType::DOT:
             $i++;
-            if ($follow_type === TokenType::DOT)
-                $sym = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line);
-            else if ($sym["type"] instanceof ListType)
-                $sym = list_get($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line, true);
-            else return unexpected_token($lex[$i], $line);
-            if ($sym === false) return false;
-            continue;
+            $sym = dereference($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line);
+            break;
+        case TokenType::L_BRACKIE:
+            if (!($sym["type"] instanceof ListType)) return unexpected_token($lex[$i], $line);
+            $i++;
+            $sym = parse_list_brackie($_GLOBALS, $lex, &$i, $line, $sym);
+            break;
+        default:
+            $done = true;
         }
-        break;
+        if ($sym === false) return false;
     }
     if ($sym["type"] != $e && $e !== "") return bad_conversion($e, $sym["type"]);
     if ($sym["type"] instanceof ListType && $ref) increment_ref_count($_GLOBALS, $sym["value"]);
     return $sym;
+}
+
+// Called when list is followed by left bracket (ex. new List<int>()[ ... )
+function parse_list_brackie(dict $_GLOBALS, vec $lex, int &$i, string $line, $sym) {
+    if (!($lex[$i]["type"] === TokenType::R_BRACKIE)) {
+        // TODO: set case list[5] = ...
+        return list_get($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line, true);
+    }
+    $i++;
+    if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::ASSIGN)) return false;
+    return list_add($_GLOBALS, $sym["type"], $sym["value"], $lex, &$i, $line, false);
 }
 
 function parse_first_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref, $token) {
