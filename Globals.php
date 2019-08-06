@@ -6,6 +6,11 @@ class QueryResult {
     public function __construct(int $q_num) {
         $this->q_num = $q_num;
     }
+
+    // for debugging
+    public function __toString() {
+        return "QueryResult@" . $this->q_num;
+    }
 }
 
 class ListType {

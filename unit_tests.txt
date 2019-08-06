@@ -796,38 +796,44 @@ OUTPUT
 "postal"
 
 NAME
-list add/get success
+list add/get/set success
 INPUT
 List<int> goodList10 = new List<int>();
 new List<String>()[] = "this shouldn't produce an error";
-new Favorites(null, new List<String>(), null, null, null).comments.add("This somehow should work too");
+new Favorites(null, new List<String>(), null, null, null).comments.add("this somehow should work too");
 goodList10.add(35);
 goodList10[] = 22;
 goodList10.add(-446);
 goodList10[2];
 goodList10.get(0);
+goodList10.set(0, -5);
+goodList10[0];
 List<List<List<User>>> goodList12 = new List<List<List<User>>>();
 goodList12.add(new List<List<User>>());
 goodList12.get(0).add(new List<User>());
 goodList12[0][0][] = new User("Nesty", -1285191528076130, null, null);
 goodList12.get(0)[0].add(goodList12[0][0][0]);
 goodList12[0].get(0).get(1).username;
+goodList12[0][0][1] = null; 
+goodList12.get(0).get(0).get(1);
 OUTPUT
 -446
 35
+-5
 "Nesty"
+null
 
 NAME
-list add/get fail
+list add/get/set fail
 INPUT
 List<int> goodList13 = new List<int>();
 goodList13.add("haha");
 goodList13[0];
 goodList13.get(-6);
-goodList13.add(new Prims("", 0,     0, 0, 0, 0, 0, '\"', false).i);
-new Favorites(null, new List<String>(), null, null, null).comments.get(0);
+goodList13.add(new Prims("", 0, 0, 0, 0, 0, 0, '\"', false).i);
+new Favorites(null, new List<String>(), null, null, null).comments[0] = "FAILURE";
 new Favorites(null, new List<String>(), null, null, null).comments.get(new Prims("", 0, 0, 0, 0, 0, 0, '\"', false).i);
-new List<int>().get(0);
+new List<int>().set(0, 30);
 OUTPUT
 Error: cannot convert String to int
 Error: index 0 out of bounds for length 0

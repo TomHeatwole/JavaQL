@@ -78,6 +78,9 @@ for (;;) {
         for ($j = 0; $j < count($query_pieces); $j++)
             if ($query_pieces[$j] instanceof QueryResult)
                 $query_pieces[$j] = $query_results[$query_pieces[$j]->q_num][0];
+            else if ($query_pieces[$j] === null) {
+                $query_pieces[$j] = "NULL";
+            }
         if (!$result = mysqli_query($_GLOBALS["conn"], implode($query_pieces))) {
             error($_GLOBALS["MYSQL_ERROR"]);
             // echo implode($query_pieces); // For debugging
@@ -88,9 +91,7 @@ for (;;) {
         if ($list_bounds_queue->containsKey($i)) {
             $check = $list_bounds_queue[$i];
             if (!list_check_bounds($_GLOBALS, replace_if_qr($_GLOBALS, $check["id"], $query_results),
-                replace_if_qr($_GLOBALS, $check["index"], $query_results))) {
-                $quit = true;
-            }
+                replace_if_qr($_GLOBALS, $check["index"], $query_results))) $quit = true;
         }
     }
     if ($quit) continue;
@@ -463,17 +464,17 @@ function parse_new_list(dict $_GLOBALS, vec $lex, int &$i, string $line) {
         $subtype_table = "_list";
         $sql_type = "int";
     } else $sql_type = $_GLOBALS["PRIM"]->contains($subtype) ? $_GLOBALS["TO_SQL_TYPE_MAP"][$subtype] : "int";
-    $cols = " (value " . $sql_type;
+    $cols = " (_id int NOT NULL AUTO_INCREMENT, value " . $sql_type ;
     $insert_values = vec["default", list_subtype_to_sql($subtype), $size, 0];
     $_GLOBALS["query_queue"][] = vec["INSERT INTO _list VALUES (" . implode(", ", $insert_values) . " )"];
     $ret = shape(
         "type" => new ListType($subtype, 0),
         "value" => queue_query($_GLOBALS, vec["SELECT LAST_INSERT_ID()"])
     );
-
     $cols .= ($sql_type === "int")
-        ? ", FOREIGN KEY (value) REFERENCES " . $subtype_table . "(_id) ON DELETE SET NULL)"
-        : ")";
+        ? ", FOREIGN KEY (value) REFERENCES " . $subtype_table . "(_id) ON DELETE SET NULL"
+        : "";
+    $cols .= ", PRIMARY KEY(_id))";
     $_GLOBALS["query_queue"][] = vec["CREATE TABLE _list_", $ret["value"], $cols];
     // if ($copy_list) queue_query($_GLOBALS, vec[""]); TODO: Figure out how to copy these in in one query
     // TODO: It's also possible that duplicating the entire table can be done in a query in which case we modify the code above
@@ -580,7 +581,7 @@ function parse_list_get_paren(dict $_GLOBALS, $type, $list_id, vec $lex, int &$i
 function list_get(dict $_GLOBALS, $index, $list_id, ListType $type) {
     if (!list_try_bounds_check($_GLOBALS, $list_id, $index)) return false;
     return shape(
-        "value" => queue_query($_GLOBALS, vec["SELECT * FROM _list_", $list_id, " LIMIT ", $index, ",1"]),
+        "value" => queue_query($_GLOBALS, vec["SELECT value FROM _list_", $list_id, " ORDER BY _id LIMIT ", $index, ",1"]),
         "type" => $type->inner()
     );
 }
@@ -589,7 +590,7 @@ function parse_list_add(dict $_GLOBALS, ListType $type, $list_id, vec $lex, int 
     if (!($add_value = parse_expression($_GLOBALS, $lex, &$i, $line, $type->inner(), true))) return false;
     if ($r_paren && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
     $add_value = $add_value["value"];
-    queue_query($_GLOBALS, vec["INSERT INTO _list_", $list_id, " values(", $add_value, ")"]);
+    queue_query($_GLOBALS, vec["INSERT INTO _list_", $list_id, " values(default, ", $add_value, ")"]);
     return shape("value" => "", "type" => "no print");
 }
 
@@ -605,7 +606,8 @@ function parse_list_set_paren(dict $_GLOBALS, $type, $list_id, vec $lex, int &$i
 
 function list_set(dict $_GLOBALS, $list_id, $index, $new_value) {
     if (!list_try_bounds_check($_GLOBALS, $list_id, $index)) return false;
-    // TODO: queue_query command that updates only the nth results :/
+    queue_query($_GLOBALS, vec["UPDATE (_list_" , $list_id , " INNER JOIN (SELECT _id FROM _list_", $list_id,
+        " ORDER BY _id LIMIT " , $index, ",1) u ON _list_" , $list_id , "._id = u._id) set value=" , $new_value]);
     return shape("value" => "", "type" => "no print");
 }
 
