@@ -83,7 +83,7 @@ for (;;) {
             }
         if (!$result = mysqli_query($_GLOBALS["conn"], implode($query_pieces))) {
             error($_GLOBALS["MYSQL_ERROR"]);
-            // echo implode($query_pieces); // For debugging
+            // echo implode($query_pieces), "\n"; // For debugging
             $quit = true;
             break;
         }
@@ -91,7 +91,10 @@ for (;;) {
         if ($list_bounds_queue->containsKey($i)) {
             $check = $list_bounds_queue[$i];
             if (!list_check_bounds($_GLOBALS, replace_if_qr($_GLOBALS, $check["id"], $query_results),
-                replace_if_qr($_GLOBALS, $check["index"], $query_results))) $quit = true;
+                replace_if_qr($_GLOBALS, $check["index"], $query_results))) {
+                $quit = true;
+                break;
+            }
         }
     }
     if ($quit) continue;
@@ -601,11 +604,15 @@ function parse_list_set_paren(dict $_GLOBALS, $type, $list_id, vec $lex, int &$i
     if (!($new_value = parse_expression($_GLOBALS, $lex, &$i, $line, $type->inner(), false))) return false;
     $new_value = $new_value["value"];
     if (!must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
-    return list_set($_GLOBALS, $list_id, $index, $new_value);
+    return list_set($_GLOBALS, $list_id, $index, $new_value, $type);
 }
 
-function list_set(dict $_GLOBALS, $list_id, $index, $new_value) {
+function list_set(dict $_GLOBALS, $list_id, $index, $new_value, $type) {
     if (!list_try_bounds_check($_GLOBALS, $list_id, $index)) return false;
+    if ($type instanceof ListType) {
+        decrement_ref_count($_GLOBALS, queue_query($_GLOBALS,
+        vec["SELECT value FROM _list_", $list_id , " ORDER BY _id LIMIT " , $index , ", 1"]));
+    }
     queue_query($_GLOBALS, vec["UPDATE (_list_" , $list_id , " INNER JOIN (SELECT _id FROM _list_", $list_id,
         " ORDER BY _id LIMIT " , $index, ",1) u ON _list_" , $list_id , "._id = u._id) set value=" , $new_value]);
     return shape("value" => "", "type" => "no print");
@@ -670,7 +677,7 @@ function parse_list_brackie(dict $_GLOBALS, vec $lex, int &$i, string $line, $sy
     $i++;
     if (!($new_value = parse_expression($_GLOBALS, $lex, &$i, $line, $sym["type"]->inner(), true))) return false;
     $new_value = $new_value["value"];
-    return list_set($_GLOBALS, $sym["value"], $index, $new_value);
+    return list_set($_GLOBALS, $sym["value"], $index, $new_value, $sym["type"]);
 }
 
 function parse_first_type(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref, $token) {
@@ -1234,12 +1241,12 @@ function delete_list(dict $_GLOBALS, int $id) {
 
 function decrement_ref_count(dict $_GLOBALS, $id) {
     if ($id === null) return;
-    $_GLOBALS["query_queue"][] = vec["UPDATE _list SET ref_count = ref_count - 1 WHERE _id=" . $id];
+    $_GLOBALS["query_queue"][] = vec["UPDATE _list SET ref_count = ref_count - 1 WHERE _id=", $id];
 }
 
 function increment_ref_count(dict $_GLOBALS, $id) {
     if ($id === null) return;
-    queue_query($_GLOBALS, vec["UPDATE _list SET ref_count = ref_count + 1 WHERE _id=", $id, ""]);
+    queue_query($_GLOBALS, vec["UPDATE _list SET ref_count = ref_count + 1 WHERE _id=", $id]);
 }
 
 // For debugging

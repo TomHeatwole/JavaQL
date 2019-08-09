@@ -814,8 +814,9 @@ goodList12.get(0).add(new List<User>());
 goodList12[0][0][] = new User("Nesty", -1285191528076130, null, null);
 goodList12.get(0)[0].add(goodList12[0][0][0]);
 goodList12[0].get(0).get(1).username;
-goodList12[0][0][1] = null; 
+goodList12[0][0][1] = null;
 goodList12.get(0).get(0).get(1);
+goodList12[0].set(0, null);
 OUTPUT
 -446
 35
