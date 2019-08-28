@@ -845,6 +845,24 @@ Error: index 0 out of bounds for length 0
 Error: index 0 out of bounds for length 0
 
 NAME
+list add/get/set fail on null list
+INPUT
+List<int> nullList;
+nullList[] = 600;
+nullList.add(-11);
+nullList.set(0, 30);
+nullList[0] = 30;
+nullList.get(30);
+nullList[10];
+OUTPUT
+Error: cannot manipulate null list
+Error: cannot manipulate null list
+Error: cannot manipulate null list
+Error: cannot manipulate null list
+Error: cannot manipulate null list
+Error: cannot manipulate null list
+
+NAME
 list add/get success with queued bounds check
 INPUT
 List<String> goodList14 = new List<String>();

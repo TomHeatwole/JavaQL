@@ -55,7 +55,7 @@ $_GLOBALS["class_map"] = new Map($class_map);
 $_GLOBALS["symbol_table"] = new Map();
 
 collect_garbo($_GLOBALS);
-destroy_all_lists($_GLOBALS); // For debugging
+// destroy_all_lists($_GLOBALS); // For debugging
 
 // Begin CLI 
 for (;;) {
@@ -64,6 +64,7 @@ for (;;) {
     $_GLOBALS["assign"] = new Map();
     $_GLOBALS["print_qr"] = new Map();
     $_GLOBALS["list_bounds_queue"] = new Map();
+    $_GLOBALS["list_null_queue"] = new Map();
     $line = trim(readline($_GLOBALS["PROJECT_NAME"] . "> "));
     if ($line === "q" || $line === "quit") {
         collect_garbo($_GLOBALS);
@@ -73,6 +74,7 @@ for (;;) {
     if (!parse_statement(&$_GLOBALS, $lex["tokens"], $line)) continue;
     $query_results = new Vector();
     $list_bounds_queue = $_GLOBALS["list_bounds_queue"];
+    $list_null_queue = $_GLOBALS["list_null_queue"];
     $quit = false;
     for ($i = 0; $i < count($_GLOBALS["query_queue"]); $i++) {
         $query_pieces = $_GLOBALS["query_queue"][$i];
@@ -82,11 +84,18 @@ for (;;) {
             else if ($query_pieces[$j] === null) $query_pieces[$j] = "NULL";
         if (!$result = mysqli_query($_GLOBALS["conn"], implode($query_pieces))) {
             error($_GLOBALS["MYSQL_ERROR"]);
-            // echo implode($query_pieces), "\n"; // For debugging
+            echo implode($query_pieces), "\n"; // For debugging
             $quit = true;
             break;
         }
         $query_results[] = ($result === true) ? $result : mysqli_fetch_row($result);
+        if ($list_null_queue->containsKey($i)) {
+            $qr = $list_null_queue[$i];
+            if (!list_check_null($query_results[$qr->q_num][0])) {
+                $quit = true;
+                break;
+            }
+        }
         if ($list_bounds_queue->containsKey($i)) {
             $check = $list_bounds_queue[$i];
             if (!list_check_bounds($_GLOBALS, replace_if_qr($_GLOBALS, $check["id"], $query_results),
@@ -586,6 +595,7 @@ function parse_list_get_paren(dict $_GLOBALS, $type, $list_id, vec $lex, int &$i
 }
 
 function list_get(dict $_GLOBALS, $index, $list_id, ListType $type) {
+    if (!list_try_null_check($_GLOBALS, $list_id)) return false;
     if (!list_try_bounds_check($_GLOBALS, $list_id, $index)) return false;
     return shape(
         "value" => queue_query($_GLOBALS, vec["SELECT value FROM _list_", $list_id, " ORDER BY _id LIMIT ", $index, ",1"]),
@@ -596,6 +606,7 @@ function list_get(dict $_GLOBALS, $index, $list_id, ListType $type) {
 function parse_list_add(dict $_GLOBALS, ListType $type, $list_id, vec $lex, int &$i, string $line, bool $r_paren) {
     if (!($add_value = parse_expression($_GLOBALS, $lex, &$i, $line, $type->inner(), true))) return false;
     if ($r_paren && !must_match($_GLOBALS, $lex, $i++, $line, TokenType::R_PAREN)) return false;
+    if (!list_try_null_check($_GLOBALS, $list_id)) return false;
     $add_value = $add_value["value"];
     queue_query($_GLOBALS, vec["INSERT INTO _list_", $list_id, " values(default, ", $add_value, ")"]);
     return shape("value" => "", "type" => "no print");
@@ -612,6 +623,7 @@ function parse_list_set_paren(dict $_GLOBALS, $type, $list_id, vec $lex, int &$i
 }
 
 function list_set(dict $_GLOBALS, $list_id, $index, $new_value, $type) {
+    if (!list_try_null_check($_GLOBALS, $list_id)) return false;
     if (!list_try_bounds_check($_GLOBALS, $list_id, $index)) return false;
     if ($type instanceof ListType) {
         decrement_ref_count($_GLOBALS, queue_query($_GLOBALS,
@@ -630,7 +642,15 @@ function list_try_bounds_check(dict $_GLOBALS, $list_id, $index) {
     return list_check_bounds($_GLOBALS, $list_id, $index);
 }
 
-function list_check_bounds(dict $_GLOBALS, $list_id, $index) {
+function list_try_null_check(dict $_GLOBALS, $list_id) {
+    if ($list_id instanceof QueryResult) {
+        $_GLOBALS["list_null_queue"][count($_GLOBALS["query_queue"]) - 1] = $list_id;
+        return true;
+    }
+    return list_check_null($list_id);
+}
+
+function list_check_bounds(dict $_GLOBALS, $list_id, $index) : boolean {
     if (!($size = mysqli_query($_GLOBALS["conn"], "SELECT count(*) FROM _list_" . $list_id))) {
         return error($_GLOBALS["MYSQL_ERROR"]);
     }
@@ -639,6 +659,9 @@ function list_check_bounds(dict $_GLOBALS, $list_id, $index) {
     return true;
 }
 
+function list_check_null($list_id) : boolean {
+    return $list_id === null ? error("cannot manipulate null list") : true;
+}
 
 // return sym if parsed correctly or false otherwise
 function parse_expression(dict $_GLOBALS, vec $lex, int &$i, string $line, $e, bool $ref) {
