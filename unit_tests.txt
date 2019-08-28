@@ -817,6 +817,7 @@ goodList12[0].get(0).get(1).username;
 goodList12[0][0][1] = null;
 goodList12.get(0).get(0).get(1);
 goodList12[0].set(0, null);
+goodList12[0][0] = null;
 OUTPUT
 -446
 35

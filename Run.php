@@ -55,11 +55,12 @@ $_GLOBALS["class_map"] = new Map($class_map);
 $_GLOBALS["symbol_table"] = new Map();
 
 collect_garbo($_GLOBALS);
-// destroy_all_lists($_GLOBALS); // For debugging
+destroy_all_lists($_GLOBALS); // For debugging
 
 // Begin CLI 
 for (;;) {
     $_GLOBALS["query_queue"] = new Vector();
+    $_GLOBALS["dec_queue"] = new Vector();
     $_GLOBALS["assign"] = new Map();
     $_GLOBALS["print_qr"] = new Map();
     $_GLOBALS["list_bounds_queue"] = new Map();
@@ -78,9 +79,7 @@ for (;;) {
         for ($j = 0; $j < count($query_pieces); $j++)
             if ($query_pieces[$j] instanceof QueryResult)
                 $query_pieces[$j] = $query_results[$query_pieces[$j]->q_num][0];
-            else if ($query_pieces[$j] === null) {
-                $query_pieces[$j] = "NULL";
-            }
+            else if ($query_pieces[$j] === null) $query_pieces[$j] = "NULL";
         if (!$result = mysqli_query($_GLOBALS["conn"], implode($query_pieces))) {
             error($_GLOBALS["MYSQL_ERROR"]);
             // echo implode($query_pieces), "\n"; // For debugging
@@ -98,6 +97,11 @@ for (;;) {
         }
     }
     if ($quit) continue;
+    foreach($_GLOBALS["dec_queue"] as $qr) {
+        $id = $query_results[$qr->q_num][0];
+        if ($id === null) continue;
+        mysqli_query($_GLOBALS["conn"], "UPDATE _list SET ref_count = ref_count - 1 WHERE _id=" . $id);
+    }
     $assign = $_GLOBALS["assign"];
     if (count($assign) > 0) {
         $_GLOBALS["symbol_table"][$assign["name"]] = shape(
@@ -1241,7 +1245,8 @@ function delete_list(dict $_GLOBALS, int $id) {
 
 function decrement_ref_count(dict $_GLOBALS, $id) {
     if ($id === null) return;
-    $_GLOBALS["query_queue"][] = vec["UPDATE _list SET ref_count = ref_count - 1 WHERE _id=", $id];
+    if ($id instanceof QueryResult) $_GLOBALS["dec_queue"][] = $id;
+    else $_GLOBALS["query_queue"][] = vec["UPDATE _list SET ref_count = ref_count - 1 WHERE _id=", $id];
 }
 
 function increment_ref_count(dict $_GLOBALS, $id) {
