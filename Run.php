@@ -343,28 +343,14 @@ function parse_statement(dict &$_GLOBALS, vec $lex, string $line) {
         if (!($new_name = parse_expression($_GLOBALS, $lex, &$i, $line, "String", false))) return false;
         $new_name = remove_quotes($new_name["value"]);
         if (strlen($new_name) === 0) return error("cannot rename variable to empty string");
-        if ($is_class) {
-            // TODO: make sure new class name is unique
-            /*
-            return carrot_and_error("new class name nust be unique - found "
-            . $_GLOBALS["TOKEN_NAME_MAP"][$new_name_type], $line, $lex[$i]["char_num"]);
-             */
-        }
         if (!r_paren_semi($_GLOBALS, $lex, $i, $line)) return false;
-        if ($is_class) return error("NOT IMPLEMENTED");  // TODO: return rename_class($_GLOBALS, $class_name, $new_name);
-        /* class stuff:
-            // check if there are any differences betweem classes/ and current database. Fail if there are.
-            // TODO: Are you sure?
-            $query = "RENAME TABLE " . $class_name . " TO " . $class_name;
-            if (!mysqli_query($_GLOBALS["conn"], $query)) return error(!$_GLOBALS["/YSQL_ERROR"]);
-            $_GLOBALS["class_map"][$new_name] = $_GLOBALS["class_map"][$class_name];
-            $_GLOBALS["class_map"]->remove($class_name);
-            // - rename in ALL files
-            // - rename ALL over sym table
-            // - rename ALL over class_map
-            // - rename ALL columns of type $class_name
-         */
-        // TODO: Check if there are differences with class file.
+        if ($is_class) {
+            // TODO: Check if it's a reserved word - Does it not make sense to accept a string if reserved words aren't allowed?
+            if ($_GLOBALS["class_map"]->containsKey($new_name)) return error("new class name must be unique");
+            if ($_GLOBALS["symbol_table"]->containsKey($new_name))
+                return error("classes cannot share names with local variables");
+            return rename_class($_GLOBALS, $class_name, $new_name);
+        }
         if ($new_name === $var_name) return true;
         foreach($_GLOBALS["class_map"][$class_name]->toKeysArray() as $key) {
             if ($key === $new_name) return error($class_name . " already has a variable named " . $new_name);
@@ -425,6 +411,48 @@ function parse_statement(dict &$_GLOBALS, vec $lex, string $line) {
         return display($_GLOBALS, $sym["type"], $sym["value"]);
     }
     return unexpected_token($lex[0], $line);
+}
+
+function rename_class(dict $_GLOBALS, string $old_name, string $new_name) {
+    $confirm = readline("Are you sure you want to rename class " . $old_name . " to " . $new_name . "? (y/n) ");
+    if ($confirm !== "y" && $confirm !== "yes") return false;
+    if (!mysqli_query($_GLOBALS["conn"], "RENAME TABLE " . $old_name . " TO " . $new_name))
+        return error($_GLOBALS["MYSQL_ERROR"]);
+    // rename in lists
+    if (!mysqli_query($_GLOBALS["conn"], "UPDATE _list SET generic= \"" . $new_name . "\" WHERE generic=\"" . $old_name . "\"")) {
+        echo "UPDATE _list WHERE generic=\"" . $old_name . "\" SET generic= \"" . $new_name . "\"";
+        return error($_GLOBALS["MYSQL_ERROR"]);
+    }
+    // TODO: Look up mysql regex function to do _L3oldname --> _L3newname
+    // - rename in class_map and database
+    $_GLOBALS["class_map"][$new_name] = $_GLOBALS["class_map"][$old_name];
+    $_GLOBALS["class_map"]->remove($old_name);
+    foreach ($_GLOBALS["class_map"]->toKeysArray() as $key) {
+        foreach ($_GLOBALS["class_map"][$key]->toKeysArray() as $var_name) {
+            $var_type = $_GLOBALS["class_map"][$key][$var_name];
+            if ($var_type === $old_name)
+                $_GLOBALS["class_map"][$key][$var_name] = $new_name;
+            else if ($var_type instanceof ListType && $var_type->subtype === $old_name)
+                $update_subtype = true;
+            else continue;
+            $old_col_name = java_ref_to_mysql($var_type, $var_name);
+            if ($update_subtype) {
+                $var_type->subtype = $new_name;
+                $new_col_name = java_ref_to_mysql($var_type, $var_name);
+            } else $new_col_name = java_ref_to_mysql($new_name, $var_name);
+            if (!mysqli_query($_GLOBALS["conn"], "ALTER TABLE " . $key .
+                " RENAME COLUMN " . $old_col_name . " TO " . $new_col_name))
+                return error($_GLOBALS["MYSQL_ERROR"]);
+        }
+    }
+    // rename in symbol table
+    foreach ($_GLOBALS["symbol_table"]->toKeysArray() as $key) {
+        $sym = $_GLOBALS["symbol_table"][$key];
+        if ($sym["type"] === $old_name) $_GLOBALS["symbol_table"][$key]["type"] = $new_name;
+        else if ($sym["type"] instanceof ListType && $sym["type"]->subtype === $old_name)
+            $sym["type"]->subtype = $new_name;
+    }
+    // - rename in ALL files
 }
 
 // return false or type & value of new object
@@ -576,7 +604,10 @@ function dereference(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $l
         if ($value instanceof QueryResult) $value = queue_query($_GLOBALS, vec[$query, $value]);
         else {
             $result = mysqli_query($_GLOBALS["conn"], $query . $value);
-            if (!$result) return error($_GLOBALS["MYSQL_ERROR"]);
+            if (!$result) {
+                echo "THIS???????";
+                return error($_GLOBALS["MYSQL_ERROR"]);
+            }
             $value = mysqli_fetch_row($result)[0];
             if ($type === "String") $value = add_quotes($value);
             else if ($type === "char") $value = add_single_quotes($value);

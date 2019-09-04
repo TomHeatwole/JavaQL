@@ -253,6 +253,48 @@ null
 }
 
 NAME
+rename class success
+INPUT
+List<User> rename0 = new List<User>();
+User rename1;
+rename(User, "Account");
+y
+getDesc(User);
+getDesc(Account);
+rename0
+Account rename2 = new Account("username", 1405101240124, rename1, null);
+Account rename3 = rename1;
+List<Account> rename4 = rename0;
+rename(Account, "User");
+y
+Favorites rename5 = new Favorites(new List<Post>(), null, null, null, null);
+rename(Post, "Document");
+y
+getDesc(Favorites);
+new Favorites(rename5.posts, null, null, null, null);
+rename(Document, "Post");
+y
+OUTPUT
+getDesc(User);
+        ^
+Error: expected class name but found unknown identifier
+{
+    "username": "String",
+    "password": "long",
+    "bestFriend": "Account",
+    "data": "Prims"
+}
+List<Account>@#
+{
+    "posts": "List<Document>",
+    "comments": "List<String>",
+    "tripleList": "List<List<List<int>>>",
+    "triplePrims": "List<List<List<Prims>>>",
+    "owner": "User"
+}
+Favorites@#
+
+NAME
 rename class variable fail on used variable name
 INPUT
 rename(User.username, "data");
