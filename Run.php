@@ -420,7 +420,6 @@ function rename_class(dict $_GLOBALS, string $old_name, string $new_name) {
         return error($_GLOBALS["MYSQL_ERROR"]);
     // rename in lists
     if (!mysqli_query($_GLOBALS["conn"], "UPDATE _list SET generic= \"" . $new_name . "\" WHERE generic=\"" . $old_name . "\"")) {
-        echo "UPDATE _list WHERE generic=\"" . $old_name . "\" SET generic= \"" . $new_name . "\"";
         return error($_GLOBALS["MYSQL_ERROR"]);
     }
     // TODO: Look up mysql regex function to do _L3oldname --> _L3newname
@@ -605,7 +604,6 @@ function dereference(dict $_GLOBALS, $type, $value, vec $lex, int &$i, string $l
         else {
             $result = mysqli_query($_GLOBALS["conn"], $query . $value);
             if (!$result) {
-                echo "THIS???????";
                 return error($_GLOBALS["MYSQL_ERROR"]);
             }
             $value = mysqli_fetch_row($result)[0];
